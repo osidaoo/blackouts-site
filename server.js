@@ -291,6 +291,25 @@ app.post("/pedidos", async (req, res) => {
   }
 })
 
+app.get("/admin/pedidos", autenticarToken, somenteAdmin, async (req, res) => {
+  try {
+
+    const { data, error } = await supabase
+      .from("pedidos")
+      .select("*")
+      .order("criado_em", { ascending: false })
+
+    if (error) {
+      return res.status(500).json({ erro: error.message })
+    }
+
+    res.json(data)
+
+  } catch (error) {
+    res.status(500).json({ erro: "Erro ao buscar pedidos" })
+  }
+})
+
 app.listen(PORT, () => {
   console.log("Servidor rodando na porta", PORT)
 })
