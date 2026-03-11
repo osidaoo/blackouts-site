@@ -3,11 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
 <title>Blackouts Store</title>
-
 <style>
-
 :root{
 --bg:#02040a;
 --bg2:#07111f;
@@ -17,16 +14,16 @@
 --muted:#aab5d6;
 --primary:#4ea1ff;
 --primary2:#7cc0ff;
+--danger:#ff5f7a;
+--ok:#3ddc97;
 --radius:20px;
 }
-
 *{
 box-sizing:border-box;
 margin:0;
 padding:0;
 font-family:Arial, Helvetica, sans-serif;
 }
-
 body{
 min-height:100vh;
 background:
@@ -35,12 +32,10 @@ linear-gradient(180deg, var(--bg), var(--bg2));
 color:var(--text);
 padding:24px;
 }
-
 .container{
 max-width:1200px;
 margin:auto;
 }
-
 .header{
 display:flex;
 justify-content:space-between;
@@ -49,49 +44,41 @@ margin-bottom:40px;
 flex-wrap:wrap;
 gap:12px;
 }
-
 .logo{
 font-size:30px;
 font-weight:900;
 letter-spacing:2px;
 color:var(--primary2);
 }
-
 .subtitle{
 color:var(--muted);
 font-size:14px;
 }
-
 .grid{
 display:grid;
 grid-template-columns:repeat(auto-fit,minmax(250px,1fr));
 gap:20px;
 }
-
 .card{
 background:var(--panel);
 border:1px solid var(--line);
 border-radius:var(--radius);
 padding:20px;
 }
-
 .card h3{
 margin-bottom:10px;
 }
-
 .price{
 font-size:20px;
 font-weight:bold;
 color:var(--primary2);
 margin-bottom:14px;
 }
-
 .stock{
 font-size:13px;
 color:var(--muted);
 margin-bottom:14px;
 }
-
 .btn{
 border:none;
 border-radius:12px;
@@ -102,25 +89,80 @@ font-weight:700;
 background:linear-gradient(135deg,var(--primary),var(--primary2));
 color:#00152f;
 }
-
 .btn:hover{
 opacity:.9;
 }
-
 .loading{
 color:var(--muted);
 }
-
 .footer{
 margin-top:50px;
 text-align:center;
 color:var(--muted);
 font-size:13px;
 }
-
+.modal-bg{
+position:fixed;
+inset:0;
+background:rgba(0,0,0,.7);
+display:none;
+align-items:center;
+justify-content:center;
+padding:20px;
+}
+.modal{
+width:100%;
+max-width:420px;
+background:var(--panel);
+border:1px solid var(--line);
+border-radius:24px;
+padding:24px;
+}
+.modal h3{
+margin-bottom:16px;
+}
+input{
+width:100%;
+padding:14px 16px;
+border-radius:14px;
+border:1px solid rgba(255,255,255,.12);
+background:rgba(255,255,255,.04);
+color:#fff;
+outline:none;
+margin-bottom:14px;
+font-size:15px;
+}
+.status{
+margin-top:10px;
+padding:12px 14px;
+border-radius:14px;
+font-size:14px;
+display:none;
+}
+.status.ok{
+display:block;
+background:rgba(61,220,151,.1);
+color:#bdf5dc;
+border:1px solid rgba(61,220,151,.2);
+}
+.status.error{
+display:block;
+background:rgba(255,95,122,.1);
+color:#ffd6de;
+border:1px solid rgba(255,95,122,.2);
+}
+.btn-row{
+display:flex;
+gap:10px;
+margin-top:10px;
+}
+.btn-secondary{
+background:rgba(255,255,255,.08);
+color:#fff;
+border:1px solid rgba(255,255,255,.12);
+}
 </style>
 </head>
-
 <body>
 
 <div class="container">
@@ -144,69 +186,135 @@ Blackouts © 2026
 
 </div>
 
-<script>
+<div id="modalBg" class="modal-bg">
+  <div class="modal">
+    <h3>Finalizar pedido</h3>
 
+    <input type="hidden" id="produtoIdPedido">
+
+    <input id="nomeCliente" type="text" placeholder="Seu nome">
+    <input id="emailCliente" type="email" placeholder="Seu e-mail">
+
+    <div class="btn-row">
+      <button class="btn" onclick="enviarPedido()">Confirmar pedido</button>
+      <button class="btn btn-secondary" onclick="fecharModal()">Cancelar</button>
+    </div>
+
+    <div id="pedidoStatus" class="status"></div>
+  </div>
+</div>
+
+<script>
 const API_URL = "https://blackouts-site.onrender.com"
 
 async function carregarProdutos(){
+  const container = document.getElementById("produtos")
 
-const container = document.getElementById("produtos")
+  try{
+    const res = await fetch(API_URL + "/produtos")
+    const produtos = await res.json()
 
-try{
+    if(!produtos.length){
+      container.innerHTML = "Nenhum produto disponível."
+      return
+    }
 
-const res = await fetch(API_URL + "/produtos")
+    let html = ""
 
-const produtos = await res.json()
+    produtos.forEach(produto => {
+      html += `
+        <div class="card">
+          <h3>${produto.nome}</h3>
 
-if(!produtos.length){
-container.innerHTML = "Nenhum produto disponível."
-return
+          <div class="price">
+            R$ ${Number(produto.preco).toFixed(2)}
+          </div>
+
+          <div class="stock">
+            Estoque: ${produto.estoque}
+          </div>
+
+          <button class="btn" onclick="abrirModal(${produto.id})">
+            Comprar
+          </button>
+        </div>
+      `
+    })
+
+    container.innerHTML = html
+  }catch(e){
+    container.innerHTML = "Erro ao carregar produtos"
+  }
 }
 
-let html = ""
-
-produtos.forEach(produto => {
-
-html += `
-<div class="card">
-
-<h3>${produto.nome}</h3>
-
-<div class="price">
-R$ ${Number(produto.preco).toFixed(2)}
-</div>
-
-<div class="stock">
-Estoque: ${produto.estoque}
-</div>
-
-<button class="btn" onclick="comprar(${produto.id})">
-Comprar
-</button>
-
-</div>
-`
-
-})
-
-container.innerHTML = html
-
-}catch(e){
-
-container.innerHTML = "Erro ao carregar produtos"
-
+function abrirModal(produtoId){
+  document.getElementById("produtoIdPedido").value = produtoId
+  document.getElementById("modalBg").style.display = "flex"
+  limparStatusPedido()
 }
 
+function fecharModal(){
+  document.getElementById("modalBg").style.display = "none"
+  document.getElementById("produtoIdPedido").value = ""
+  document.getElementById("nomeCliente").value = ""
+  document.getElementById("emailCliente").value = ""
+  limparStatusPedido()
 }
 
-function comprar(id){
+function mostrarStatusPedido(texto, tipo){
+  const el = document.getElementById("pedidoStatus")
+  el.className = "status " + tipo
+  el.textContent = texto
+}
 
-alert("Compra do produto "+id+" será implementada no próximo passo.")
+function limparStatusPedido(){
+  const el = document.getElementById("pedidoStatus")
+  el.className = "status"
+  el.textContent = ""
+}
 
+async function enviarPedido(){
+  const produto_id = Number(document.getElementById("produtoIdPedido").value)
+  const nome_cliente = document.getElementById("nomeCliente").value.trim()
+  const email_cliente = document.getElementById("emailCliente").value.trim()
+
+  if(!produto_id || !nome_cliente || !email_cliente){
+    mostrarStatusPedido("Preencha nome e email.", "error")
+    return
+  }
+
+  try{
+    const res = await fetch(API_URL + "/pedidos", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        produto_id,
+        nome_cliente,
+        email_cliente
+      })
+    })
+
+    const dados = await res.json()
+
+    if(!res.ok){
+      mostrarStatusPedido(dados.erro || "Erro ao criar pedido.", "error")
+      return
+    }
+
+    mostrarStatusPedido("Pedido criado com sucesso. ID: " + dados.pedido.id, "ok")
+
+    setTimeout(() => {
+      fecharModal()
+    }, 1800)
+
+  }catch(e){
+    mostrarStatusPedido("Erro ao conectar com a API.", "error")
+  }
 }
 
 carregarProdutos()
-
 </script>
 
 </body>
