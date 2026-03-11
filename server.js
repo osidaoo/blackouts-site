@@ -1,16 +1,37 @@
-{
-  "name": "blackouts-backend",
-  "version": "1.0.0",
-  "main": "server.js",
-  "scripts": {
-    "start": "node servidor.js"
-  },
-  "dependencies": {
-    "@supabase/supabase-js": "^2.49.1",
-    "bcrypt": "^5.1.1",
-    "cors": "^2.8.5",
-    "dotenv": "^16.4.5",
-    "express": "^4.21.2",
-    "jsonwebtoken": "^9.0.2"
+const express = require("express")
+const cors = require("cors")
+const { createClient } = require("@supabase/supabase-js")
+
+const app = express()
+
+app.use(cors())
+app.use(express.json())
+
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_KEY
+)
+
+app.get("/", (req, res) => {
+  res.send("API Blackouts funcionando")
+})
+
+app.get("/produtos", async (req, res) => {
+
+  const { data, error } = await supabase
+    .from("products")
+    .select("*")
+
+  if (error) {
+    return res.status(500).json(error)
   }
-}
+
+  res.json(data)
+
+})
+
+const PORT = process.env.PORT || 3000
+
+app.listen(PORT, () => {
+  console.log("Servidor rodando na porta", PORT)
+})
