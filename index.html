@@ -1,12 +1,225 @@
 <!doctype html>
 <html lang="pt-BR">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Blackouts</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Blackouts</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Arial, Helvetica, sans-serif;
+      background:
+        radial-gradient(circle at top, rgba(37,99,235,.25), transparent 20%),
+        radial-gradient(circle at bottom, rgba(29,78,216,.18), transparent 30%),
+        #02040a;
+      color: white;
+    }
+    .header {
+      position: sticky;
+      top: 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 18px 24px;
+      border-bottom: 1px solid rgba(255,255,255,.08);
+      background: rgba(3,5,11,.84);
+      backdrop-filter: blur(12px);
+    }
+    .logo {
+      font-size: 32px;
+      font-weight: 900;
+      letter-spacing: .14em;
+      color: #7dd3fc;
+      text-shadow: 0 0 20px rgba(37,99,235,.35);
+    }
+    .nav {
+      display: flex;
+      gap: 24px;
+    }
+    .nav a {
+      color: #d4d4d8;
+      text-decoration: none;
+    }
+    .container {
+      width: min(1120px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 32px 0 72px;
+    }
+    .hero, .section {
+      border: 1px solid rgba(96,165,250,.18);
+      background: linear-gradient(180deg, rgba(8,12,24,.9), rgba(3,5,11,.96));
+      border-radius: 28px;
+      box-shadow: 0 0 50px rgba(37,99,235,.08);
+    }
+    .hero {
+      padding: 48px 24px;
+      text-align: center;
+    }
+    .hero h1 {
+      margin: 0;
+      font-size: 72px;
+      font-weight: 900;
+      color: #93c5fd;
+      text-shadow: 0 0 28px rgba(37,99,235,.45);
+    }
+    .hero h2 {
+      margin: 18px 0 0;
+      font-size: 42px;
+    }
+    .badges {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin: 24px 0;
+    }
+    .badges span {
+      padding: 10px 14px;
+      border: 1px solid rgba(96,165,250,.18);
+      border-radius: 14px;
+      background: #060914;
+    }
+    .btn {
+      display: inline-block;
+      padding: 14px 22px;
+      border-radius: 14px;
+      background: linear-gradient(180deg,#2563eb,#1d4ed8);
+      color: #fff;
+      text-decoration: none;
+      font-weight: 700;
+    }
+    .section {
+      margin-top: 28px;
+      padding: 28px 24px;
+    }
+    .section h3 {
+      margin: 0 0 18px;
+      font-size: 34px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(4,1fr);
+      gap: 18px;
+    }
+    .card, .product {
+      border: 1px solid rgba(96,165,250,.14);
+      background: #060914;
+      border-radius: 20px;
+      padding: 22px;
+    }
+    .card {
+      text-align: center;
+      font-size: 24px;
+      font-weight: 700;
+    }
+    .tag {
+      display: inline-block;
+      padding: 6px 10px;
+      border-radius: 10px;
+      background: rgba(37,99,235,.18);
+      font-size: 13px;
+      margin-bottom: 12px;
+    }
+    .product strong {
+      display: block;
+      font-size: 24px;
+      line-height: 1.15;
+    }
+    .product p {
+      color: #a1a1aa;
+      font-size: 20px;
+    }
+    .product button {
+      width: 100%;
+      padding: 12px;
+      border: 0;
+      border-radius: 12px;
+      background: #2563eb;
+      color: #fff;
+      font-weight: 700;
+    }
+    @media (max-width: 900px) {
+      .grid { grid-template-columns: repeat(2,1fr); }
+      .hero h1 { font-size: 56px; }
+      .hero h2 { font-size: 34px; }
+      .nav { display: none; }
+    }
+    @media (max-width: 640px) {
+      .grid { grid-template-columns: 1fr; }
+      .hero h1 { font-size: 42px; }
+      .hero h2 { font-size: 28px; }
+    }
+  </style>
 </head>
 <body>
-<div id="root"></div>
-<script type="module" src="/src/main.jsx"></script>
+  <header class="header">
+    <div class="logo">BLACKOUTS</div>
+    <nav class="nav">
+      <a href="#categorias">Categorias</a>
+      <a href="#produtos">Destaques</a>
+      <a href="#suporte">Suporte</a>
+    </nav>
+  </header>
+
+  <main class="container">
+    <section class="hero">
+      <h1>BLACKOUTS</h1>
+      <h2>A sua vitrine digital premium</h2>
+      <div class="badges">
+        <span>Entrega automática</span>
+        <span>Suporte rápido</span>
+        <span>Compra segura</span>
+      </div>
+      <a class="btn" href="#produtos">Ver produtos</a>
+    </section>
+
+    <section id="categorias" class="section">
+      <h3>Categorias</h3>
+      <div class="grid">
+        <div class="card">Games</div>
+        <div class="card">Assinaturas</div>
+        <div class="card">Steam Keys</div>
+        <div class="card">IA's</div>
+      </div>
+    </section>
+
+    <section id="produtos" class="section">
+      <h3>Destaques</h3>
+      <div class="grid">
+        <div class="product">
+          <div class="tag">Mais vendida</div>
+          <strong>Conta Fortnite FA</strong>
+          <p>R$ 29,90</p>
+          <button>Comprar</button>
+        </div>
+        <div class="product">
+          <div class="tag">Novo</div>
+          <strong>Netflix Premium</strong>
+          <p>R$ 12,90</p>
+          <button>Comprar</button>
+        </div>
+        <div class="product">
+          <div class="tag">Barato</div>
+          <strong>Steam Key Aleatória</strong>
+          <p>R$ 7,90</p>
+          <button>Comprar</button>
+        </div>
+        <div class="product">
+          <div class="tag">Popular</div>
+          <strong>Discord Nitro</strong>
+          <p>R$ 14,90</p>
+          <button>Comprar</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="suporte" class="section">
+      <h3>Suporte</h3>
+      <a class="btn" href="https://discord.gg/AsU5pVS7Hn" target="_blank" rel="noreferrer">
+        Entrar no Discord
+      </a>
+    </section>
+  </main>
 </body>
 </html>
