@@ -61,6 +61,19 @@ function somenteAdmin(req, res, next) {
   next()
 }
 
+function normalizarTexto(valor) {
+  return String(valor || "").trim().toLowerCase()
+}
+
+function pegarEmailUsuario(usuario) {
+  return (
+    usuario["e-mail"] ||
+    usuario.email ||
+    usuario["email"] ||
+    ""
+  )
+}
+
 app.get("/", (req, res) => {
   res.json({ status: "API Blackouts online" })
 })
@@ -89,6 +102,29 @@ app.get("/produtos", async (req, res) => {
   }
 })
 
+app.get("/debug/usuarios", async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from("Usuários")
+      .select("*")
+
+    if (error) {
+      return res.status(500).json({ erro: error.message })
+    }
+
+    const usuarios = (data || []).map((usuario) => ({
+      id: usuario.id,
+      nome: usuario.nome,
+      email: pegarEmailUsuario(usuario),
+      papel: usuario.papel
+    }))
+
+    res.json(usuarios)
+  } catch (error) {
+    res.status(500).json({ erro: "Erro ao listar usuários" })
+  }
+})
+
 app.post("/login", async (req, res) => {
   try {
     const { email, senha } = req.body
@@ -98,29 +134,39 @@ app.post("/login", async (req, res) => {
     }
 
     const { data, error } = await supabase
-        .from("Usuários")
-       .select("*")
-       .ilike("e-mail", email)
-       .single()
-    if (error || !data) {
+      .from("Usuários")
+      .select("*")
+
+    if (error) {
+      return res.status(500).json({ erro: "Erro ao consultar usuários: " + error.message })
+    }
+
+    const emailDigitado = normalizarTexto(email)
+
+    const usuario = (data || []).find((item) => {
+      const emailBanco = normalizarTexto(pegarEmailUsuario(item))
+      return emailBanco === emailDigitado
+    })
+
+    if (!usuario) {
       return res.status(401).json({ erro: "Usuário não encontrado" })
     }
 
-    const senhaValida = await bcrypt.compare(senha, data.hash_da_senha)
+    const senhaValida = await bcrypt.compare(senha, usuario.hash_da_senha)
 
     if (!senhaValida) {
       return res.status(401).json({ erro: "Senha inválida" })
     }
 
-    const token = gerarToken(data)
+    const token = gerarToken(usuario)
 
     res.json({
       token,
       usuario: {
-        id: data.id,
-        nome: data.nome,
-        email: data["e-mail"],
-        papel: data.papel
+        id: usuario.id,
+        nome: usuario.nome,
+        email: pegarEmailUsuario(usuario),
+        papel: usuario.papel
       }
     })
   } catch (error) {
