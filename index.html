@@ -677,4 +677,66 @@
     carregarProdutos();
   </script>
 </body>
+<script>
+
+async function carregarProdutos() {
+
+  try {
+
+    const resposta = await fetch("https://blackouts-site.onrender.com/produtos")
+    const produtos = await resposta.json()
+
+    const lista = document.getElementById("lista-produtos")
+
+    lista.innerHTML = ""
+
+    produtos.forEach((produto, index) => {
+
+      const card = document.createElement("article")
+      card.className = "product-card"
+
+      card.innerHTML = `
+      
+      <div class="product-banner">
+        <span class="product-tag">Produto</span>
+        <span class="product-number">${index + 1}</span>
+      </div>
+
+      <div class="product-body">
+
+        <h3>${produto.nome}</h3>
+
+        <p>${produto.descricao}</p>
+
+        <div class="product-price">
+          R$ ${Number(produto.preco).toFixed(2).replace(".",",")}
+        </div>
+
+        <div class="product-stock">
+          ${produto.estoque} em estoque
+        </div>
+
+        <button class="product-btn">
+          Comprar
+        </button>
+
+      </div>
+      
+      `
+
+      lista.appendChild(card)
+
+    })
+
+  } catch (erro) {
+
+    console.error("Erro ao carregar produtos", erro)
+
+  }
+
+}
+
+carregarProdutos()
+
+</script>
 </html>
