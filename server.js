@@ -8,13 +8,7 @@ const { createClient } = require("@supabase/supabase-js")
 
 const app = express()
 
-app.use(cors({
-  origin: true,
-  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"]
-}))
-
-app.options("*", cors())
+app.use(cors())
 app.use(express.json())
 
 const supabase = createClient(
@@ -68,9 +62,7 @@ function somenteAdmin(req, res, next) {
 }
 
 app.get("/", (req, res) => {
-  res.json({
-    status: "API Blackouts online"
-  })
+  res.json({ status: "API Blackouts online" })
 })
 
 app.get("/teste-login", (req, res) => {
