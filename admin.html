@@ -158,6 +158,7 @@
       border-radius:14px;
       font-size:14px;
       display:none;
+      white-space:pre-wrap;
     }
 
     .status.ok{
@@ -349,12 +350,17 @@
       localStorage.removeItem("blackouts_admin_user")
     }
 
+    function ehAdmin(papel) {
+      const valor = String(papel || "").toLowerCase()
+      return valor === "admin" || valor === "administrador"
+    }
+
     function mostrarTelaAdmin() {
       const usuario = getUsuario()
       loginCard.classList.add("hidden")
       adminArea.classList.remove("hidden")
       btnLogoutTop.classList.remove("hidden")
-      welcomeText.textContent = "Logado como: " + (usuario?.nome || "Administrador") + " | Papel: " + (usuario?.papel || "admin")
+      welcomeText.textContent = "Logado como: " + (usuario?.nome || "Administrador") + " | Papel: " + (usuario?.papel || "administrador")
     }
 
     function mostrarTelaLogin() {
@@ -369,6 +375,16 @@
       nomeProdutoInput.value = ""
       precoProdutoInput.value = ""
       estoqueProdutoInput.value = ""
+    }
+
+    async function lerRespostaSegura(resposta) {
+      const texto = await resposta.text()
+
+      try {
+        return texto ? JSON.parse(texto) : {}
+      } catch {
+        return { erro: texto || "Resposta inválida da API" }
+      }
     }
 
     async function login() {
@@ -391,15 +407,15 @@
           body: JSON.stringify({ email, senha })
         })
 
-        const dados = await resposta.json()
+        const dados = await lerRespostaSegura(resposta)
 
         if (!resposta.ok) {
           mostrarStatus(loginStatus, dados.erro || "Erro no login.", "error")
           return
         }
 
-        if (dados.usuario.papel !== "admin") {
-          mostrarStatus(loginStatus, "Esse usuário não é admin.", "error")
+        if (!ehAdmin(dados.usuario?.papel)) {
+          mostrarStatus(loginStatus, "Esse usuário não é administrador.", "error")
           return
         }
 
@@ -409,7 +425,11 @@
         mostrarTelaAdmin()
         carregarProdutos()
       } catch (error) {
-        mostrarStatus(loginStatus, "Erro ao conectar com a API.", "error")
+        mostrarStatus(
+          loginStatus,
+          "Falha ao conectar com a API.\nDetalhe: " + (error?.message || "erro desconhecido"),
+          "error"
+        )
       }
     }
 
@@ -428,7 +448,7 @@
           }
         })
 
-        const dados = await resposta.json()
+        const dados = await lerRespostaSegura(resposta)
 
         if (!resposta.ok || !dados.usuario) {
           limparSessao()
@@ -436,7 +456,7 @@
           return
         }
 
-        if (dados.usuario.papel !== "admin") {
+        if (!ehAdmin(dados.usuario.papel)) {
           limparSessao()
           mostrarTelaLogin()
           return
@@ -460,14 +480,14 @@
           }
         })
 
-        const dados = await resposta.json()
+        const dados = await lerRespostaSegura(resposta)
 
         if (!resposta.ok) {
-          produtosWrap.innerHTML = '<div class="empty">Erro ao carregar produtos.</div>'
+          produtosWrap.innerHTML = '<div class="empty">' + (dados.erro || "Erro ao carregar produtos.") + '</div>'
           return
         }
 
-        if (!dados.length) {
+        if (!Array.isArray(dados) || !dados.length) {
           produtosWrap.innerHTML = '<div class="empty">Nenhum produto cadastrado ainda.</div>'
           return
         }
@@ -487,6 +507,8 @@
         `
 
         for (const produto of dados) {
+          const produtoJson = encodeURIComponent(JSON.stringify(produto))
+
           html += `
             <tr>
               <td>${produto.id}</td>
@@ -495,7 +517,7 @@
               <td>${produto.estoque ?? 0}</td>
               <td>
                 <div class="produto-actions">
-                  <button class="btn btn-secondary small" onclick='editarProduto(${JSON.stringify(produto).replace(/'/g, "&apos;")})'>Editar</button>
+                  <button class="btn btn-secondary small" onclick="editarProduto('${produtoJson}')">Editar</button>
                   <button class="btn btn-danger small" onclick="deletarProduto(${produto.id})">Excluir</button>
                 </div>
               </td>
@@ -514,7 +536,8 @@
       }
     }
 
-    function editarProduto(produto) {
+    function editarProduto(produtoCodificado) {
+      const produto = JSON.parse(decodeURIComponent(produtoCodificado))
       produtoIdInput.value = produto.id
       nomeProdutoInput.value = produto.nome ?? ""
       precoProdutoInput.value = produto.preco ?? ""
@@ -558,7 +581,7 @@
           body: JSON.stringify(payload)
         })
 
-        const dados = await resposta.json()
+        const dados = await lerRespostaSegura(resposta)
 
         if (!resposta.ok) {
           mostrarStatus(produtoStatus, dados.erro || "Erro ao salvar produto.", "error")
@@ -588,7 +611,7 @@
           }
         })
 
-        const dados = await resposta.json()
+        const dados = await lerRespostaSegura(resposta)
 
         if (!resposta.ok) {
           alert(dados.erro || "Erro ao excluir produto.")
