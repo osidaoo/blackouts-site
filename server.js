@@ -8,7 +8,12 @@ const { createClient } = require("@supabase/supabase-js")
 
 const app = express()
 
-app.use(cors())
+app.use(cors({
+  origin: "*",
+  methods: ["GET","POST","PUT","DELETE"],
+  allowedHeaders: ["Content-Type","Authorization"]
+}))
+
 app.use(express.json())
 
 const supabase = createClient(
@@ -18,244 +23,234 @@ const supabase = createClient(
 
 const PORT = process.env.PORT || 3000
 
-// ======================================
-// FUNÇÕES AUXILIARES
-// ======================================
+// ==============================
+// FUNÇÕES
+// ==============================
 
-function gerarToken(usuario) {
+function gerarToken(usuario){
   return jwt.sign(
     {
       id: usuario.id,
       papel: usuario.papel
     },
     process.env.JWT_SECRET,
-    { expiresIn: "7d" }
+    { expiresIn:"7d" }
   )
 }
 
-function autenticarToken(req, res, next) {
+function autenticarToken(req,res,next){
+
   const authHeader = req.headers.authorization
 
-  if (!authHeader) {
-    return res.status(401).json({ erro: "Token não enviado" })
+  if(!authHeader){
+    return res.status(401).json({erro:"Token não enviado"})
   }
 
   const token = authHeader.split(" ")[1]
 
-  if (!token) {
-    return res.status(401).json({ erro: "Token inválido" })
-  }
+  try{
 
-  try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET)
+    const decoded = jwt.verify(token,process.env.JWT_SECRET)
+
     req.usuario = decoded
+
     next()
-  } catch (error) {
-    return res.status(401).json({ erro: "Token expirado ou inválido" })
+
+  }catch{
+
+    return res.status(401).json({erro:"Token inválido"})
+
   }
 }
 
-function somenteAdmin(req, res, next) {
-  if (!req.usuario || req.usuario.papel !== "admin") {
-    return res.status(403).json({ erro: "Acesso permitido apenas para admin" })
+function somenteAdmin(req,res,next){
+
+  if(req.usuario.papel !== "administrador"){
+    return res.status(403).json({erro:"Apenas admin"})
   }
 
   next()
 }
 
-// ======================================
-// TESTE
-// ======================================
+// ==============================
+// TESTE API
+// ==============================
 
-app.get("/", (req, res) => {
+app.get("/",(req,res)=>{
+
   res.json({
-    status: "API Blackouts online"
+    status:"API Blackouts online"
   })
+
 })
 
-// ======================================
-// LISTAR PRODUTOS PÚBLICO
-// ======================================
+// ==============================
+// PRODUTOS PUBLICO
+// ==============================
 
-app.get("/produtos", async (req, res) => {
-  const { data, error } = await supabase
-    .from("produtos")
-    .select("*")
-    .order("id", { ascending: true })
+app.get("/produtos",async(req,res)=>{
 
-  if (error) {
-    return res.status(500).json({ erro: error.message })
+  const {data,error} = await supabase
+  .from("produtos")
+  .select("*")
+
+  if(error){
+    return res.status(500).json(error)
   }
 
   res.json(data)
+
 })
 
-// ======================================
+// ==============================
 // LOGIN
-// ======================================
+// ==============================
 
-app.post("/login", async (req, res) => {
-  try {
-    const { email, senha } = req.body
+app.post("/login",async(req,res)=>{
 
-    if (!email || !senha) {
-      return res.status(400).json({ erro: "Email e senha são obrigatórios" })
-    }
+  const {email,senha} = req.body
 
-    const { data, error } = await supabase
-      .from("Usuários")
-      .select("*")
-      .eq("e-mail", email)
-      .single()
+  const {data,error} = await supabase
+  .from("Usuários")
+  .select("*")
+  .eq("e-mail",email)
+  .single()
 
-    if (error || !data) {
-      return res.status(401).json({ erro: "Usuário não encontrado" })
-    }
-
-    const senhaValida = await bcrypt.compare(senha, data.hash_da_senha)
-
-    if (!senhaValida) {
-      return res.status(401).json({ erro: "Senha inválida" })
-    }
-
-    const token = gerarToken(data)
-
-    res.json({
-      token,
-      usuario: {
-        id: data.id,
-        nome: data.nome,
-        email: data["e-mail"],
-        papel: data.papel
-      }
-    })
-  } catch (error) {
-    res.status(500).json({ erro: "Erro interno no login" })
+  if(!data){
+    return res.status(401).json({erro:"Usuário não encontrado"})
   }
-})
 
-// ======================================
-// VERIFICAR USUÁRIO LOGADO
-// ======================================
+  const senhaValida = await bcrypt.compare(
+    senha,
+    data.hash_da_senha
+  )
 
-app.get("/me", autenticarToken, async (req, res) => {
+  if(!senhaValida){
+    return res.status(401).json({erro:"Senha inválida"})
+  }
+
+  const token = gerarToken(data)
+
   res.json({
-    usuario: req.usuario
+    token,
+    usuario:{
+      id:data.id,
+      nome:data.nome,
+      papel:data.papel
+    }
   })
+
 })
 
-// ======================================
-// LISTAR PRODUTOS ADMIN
-// ======================================
+// ==============================
+// PRODUTOS ADMIN
+// ==============================
 
-app.get("/admin/produtos", autenticarToken, somenteAdmin, async (req, res) => {
-  const { data, error } = await supabase
-    .from("produtos")
-    .select("*")
-    .order("id", { ascending: true })
+app.get("/admin/produtos",
+autenticarToken,
+somenteAdmin,
+async(req,res)=>{
 
-  if (error) {
-    return res.status(500).json({ erro: error.message })
+  const {data,error} = await supabase
+  .from("produtos")
+  .select("*")
+
+  if(error){
+    return res.status(500).json(error)
   }
 
   res.json(data)
+
 })
 
-// ======================================
-// CRIAR PRODUTO ADMIN
-// ======================================
+// ==============================
+// CRIAR PRODUTO
+// ==============================
 
-app.post("/admin/produtos", autenticarToken, somenteAdmin, async (req, res) => {
-  try {
-    const { nome, preco, estoque } = req.body
+app.post("/admin/produtos",
+autenticarToken,
+somenteAdmin,
+async(req,res)=>{
 
-    if (!nome || preco === undefined || estoque === undefined) {
-      return res.status(400).json({
-        erro: "Nome, preço e estoque são obrigatórios"
-      })
+  const {nome,preco,estoque} = req.body
+
+  const {data,error} = await supabase
+  .from("produtos")
+  .insert([
+    {
+      nome,
+      preco,
+      estoque
     }
+  ])
+  .select()
 
-    const { data, error } = await supabase
-      .from("produtos")
-      .insert([
-        {
-          nome,
-          preco: Number(preco),
-          estoque: Number(estoque)
-        }
-      ])
-      .select()
-
-    if (error) {
-      return res.status(500).json({ erro: error.message })
-    }
-
-    res.json(data)
-  } catch (error) {
-    res.status(500).json({ erro: "Erro ao criar produto" })
+  if(error){
+    return res.status(500).json(error)
   }
+
+  res.json(data)
+
 })
 
-// ======================================
-// ATUALIZAR PRODUTO ADMIN
-// ======================================
+// ==============================
+// ATUALIZAR PRODUTO
+// ==============================
 
-app.put("/admin/produtos/:id", autenticarToken, somenteAdmin, async (req, res) => {
-  try {
-    const { id } = req.params
-    const { nome, preco, estoque } = req.body
+app.put("/admin/produtos/:id",
+autenticarToken,
+somenteAdmin,
+async(req,res)=>{
 
-    if (!nome || preco === undefined || estoque === undefined) {
-      return res.status(400).json({
-        erro: "Nome, preço e estoque são obrigatórios"
-      })
-    }
+  const {id} = req.params
+  const {nome,preco,estoque} = req.body
 
-    const { data, error } = await supabase
-      .from("produtos")
-      .update({
-        nome,
-        preco: Number(preco),
-        estoque: Number(estoque)
-      })
-      .eq("id", id)
-      .select()
+  const {data,error} = await supabase
+  .from("produtos")
+  .update({
+    nome,
+    preco,
+    estoque
+  })
+  .eq("id",id)
+  .select()
 
-    if (error) {
-      return res.status(500).json({ erro: error.message })
-    }
-
-    res.json(data)
-  } catch (error) {
-    res.status(500).json({ erro: "Erro ao atualizar produto" })
+  if(error){
+    return res.status(500).json(error)
   }
+
+  res.json(data)
+
 })
 
-// ======================================
-// DELETAR PRODUTO ADMIN
-// ======================================
+// ==============================
+// DELETAR PRODUTO
+// ==============================
 
-app.delete("/admin/produtos/:id", autenticarToken, somenteAdmin, async (req, res) => {
-  try {
-    const { id } = req.params
+app.delete("/admin/produtos/:id",
+autenticarToken,
+somenteAdmin,
+async(req,res)=>{
 
-    const { error } = await supabase
-      .from("produtos")
-      .delete()
-      .eq("id", id)
+  const {id} = req.params
 
-    if (error) {
-      return res.status(500).json({ erro: error.message })
-    }
+  const {error} = await supabase
+  .from("produtos")
+  .delete()
+  .eq("id",id)
 
-    res.json({ sucesso: true })
-  } catch (error) {
-    res.status(500).json({ erro: "Erro ao deletar produto" })
+  if(error){
+    return res.status(500).json(error)
   }
+
+  res.json({sucesso:true})
+
 })
 
-// ======================================
+// ==============================
 
-app.listen(PORT, () => {
-  console.log("Servidor rodando na porta", PORT)
+app.listen(PORT,()=>{
+
+  console.log("Servidor rodando na porta",PORT)
+
 })
