@@ -8,7 +8,7 @@
     :root{
       --bg:#02040a;
       --bg2:#07111f;
-      --panel:rgba(10,16,30,.88);
+      --panel:rgba(10,16,30,.92);
       --line:rgba(111,168,255,.18);
       --text:#f5f7ff;
       --muted:#aab5d6;
@@ -16,6 +16,7 @@
       --primary2:#7cc0ff;
       --danger:#ff5f7a;
       --ok:#3ddc97;
+      --warn:#ffb84d;
       --shadow:0 24px 60px rgba(0,0,0,.45);
       --radius:20px;
     }
@@ -175,6 +176,13 @@
       border:1px solid rgba(255,95,122,.2);
     }
 
+    .status.warn{
+      display:block;
+      background:rgba(255,184,77,.12);
+      color:#ffe1b3;
+      border:1px solid rgba(255,184,77,.2);
+    }
+
     .hidden{
       display:none;
     }
@@ -190,6 +198,7 @@
       padding:14px 12px;
       border-bottom:1px solid rgba(255,255,255,.08);
       font-size:14px;
+      vertical-align:middle;
     }
 
     th{
@@ -214,11 +223,47 @@
     .welcome{
       color:var(--muted);
       font-size:14px;
+      line-height:1.7;
     }
 
     .empty{
       color:var(--muted);
       padding:14px 0 4px;
+    }
+
+    .pill{
+      display:inline-block;
+      padding:8px 12px;
+      border-radius:999px;
+      background:rgba(255,255,255,.06);
+      border:1px solid rgba(255,255,255,.08);
+      font-size:13px;
+      color:#dfe8ff;
+      margin-right:8px;
+      margin-top:8px;
+    }
+
+    .stock-low{
+      color:#ffd2a1;
+      font-weight:700;
+    }
+
+    .stock-ok{
+      color:#bdf5dc;
+      font-weight:700;
+    }
+
+    .section-title{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:12px;
+      flex-wrap:wrap;
+      margin-bottom:6px;
+    }
+
+    .muted{
+      color:var(--muted);
     }
   </style>
 </head>
@@ -252,7 +297,7 @@
     <div id="adminArea" class="hidden">
       <div class="grid">
         <div class="card">
-          <h2>Cadastrar / editar produto</h2>
+          <h2 id="formTitle">Cadastrar produto</h2>
 
           <input id="produtoId" type="hidden" />
 
@@ -276,15 +321,21 @@
         <div class="card">
           <h2>Informações da sessão</h2>
           <p class="welcome" id="welcomeText">Você ainda não está logado.</p>
+
+          <div style="margin-top:14px;">
+            <span class="pill" id="totalProdutosPill">Produtos: 0</span>
+            <span class="pill" id="estoqueTotalPill">Estoque total: 0</span>
+          </div>
         </div>
       </div>
 
       <div class="card">
-        <div class="topbar" style="margin-bottom:0;">
+        <div class="section-title">
           <div>
             <h2 style="margin-bottom:6px;">Lista de produtos</h2>
             <div class="subtitle">Gerencie seus produtos por aqui</div>
           </div>
+
           <div class="btn-row">
             <button id="btnAtualizar" class="btn btn-secondary">Atualizar lista</button>
           </div>
@@ -312,6 +363,9 @@
     const produtoStatus = document.getElementById("produtoStatus")
     const produtosWrap = document.getElementById("produtosWrap")
     const welcomeText = document.getElementById("welcomeText")
+    const totalProdutosPill = document.getElementById("totalProdutosPill")
+    const estoqueTotalPill = document.getElementById("estoqueTotalPill")
+    const formTitle = document.getElementById("formTitle")
 
     const emailInput = document.getElementById("email")
     const senhaInput = document.getElementById("senha")
@@ -360,7 +414,11 @@
       loginCard.classList.add("hidden")
       adminArea.classList.remove("hidden")
       btnLogoutTop.classList.remove("hidden")
-      welcomeText.textContent = "Logado como: " + (usuario?.nome || "Administrador") + " | Papel: " + (usuario?.papel || "administrador")
+
+      welcomeText.innerHTML =
+        "Logado como: <strong>" + (usuario?.nome || "Administrador") + "</strong><br>" +
+        "E-mail: <strong>" + (usuario?.email || "-") + "</strong><br>" +
+        "Papel: <strong>" + (usuario?.papel || "administrador") + "</strong>"
     }
 
     function mostrarTelaLogin() {
@@ -375,6 +433,7 @@
       nomeProdutoInput.value = ""
       precoProdutoInput.value = ""
       estoqueProdutoInput.value = ""
+      formTitle.textContent = "Cadastrar produto"
     }
 
     async function lerRespostaSegura(resposta) {
@@ -425,11 +484,7 @@
         mostrarTelaAdmin()
         carregarProdutos()
       } catch (error) {
-        mostrarStatus(
-          loginStatus,
-          "Falha ao conectar com a API.\nDetalhe: " + (error?.message || "erro desconhecido"),
-          "error"
-        )
+        mostrarStatus(loginStatus, "Falha ao conectar com a API.", "error")
       }
     }
 
@@ -470,6 +525,14 @@
       }
     }
 
+    function atualizarResumoProdutos(produtos) {
+      const totalProdutos = produtos.length
+      const estoqueTotal = produtos.reduce((total, item) => total + Number(item.estoque || 0), 0)
+
+      totalProdutosPill.textContent = "Produtos: " + totalProdutos
+      estoqueTotalPill.textContent = "Estoque total: " + estoqueTotal
+    }
+
     async function carregarProdutos() {
       produtosWrap.innerHTML = '<div class="empty">Carregando produtos...</div>'
 
@@ -488,9 +551,12 @@
         }
 
         if (!Array.isArray(dados) || !dados.length) {
+          atualizarResumoProdutos([])
           produtosWrap.innerHTML = '<div class="empty">Nenhum produto cadastrado ainda.</div>'
           return
         }
+
+        atualizarResumoProdutos(dados)
 
         let html = `
           <table>
@@ -508,13 +574,15 @@
 
         for (const produto of dados) {
           const produtoJson = encodeURIComponent(JSON.stringify(produto))
+          const estoqueNumero = Number(produto.estoque || 0)
+          const classeEstoque = estoqueNumero <= 3 ? "stock-low" : "stock-ok"
 
           html += `
             <tr>
               <td>${produto.id}</td>
               <td>${produto.nome ?? ""}</td>
               <td>R$ ${Number(produto.preco ?? 0).toFixed(2)}</td>
-              <td>${produto.estoque ?? 0}</td>
+              <td class="${classeEstoque}">${estoqueNumero}</td>
               <td>
                 <div class="produto-actions">
                   <button class="btn btn-secondary small" onclick="editarProduto('${produtoJson}')">Editar</button>
@@ -538,11 +606,14 @@
 
     function editarProduto(produtoCodificado) {
       const produto = JSON.parse(decodeURIComponent(produtoCodificado))
+
       produtoIdInput.value = produto.id
       nomeProdutoInput.value = produto.nome ?? ""
       precoProdutoInput.value = produto.preco ?? ""
       estoqueProdutoInput.value = produto.estoque ?? ""
-      mostrarStatus(produtoStatus, "Modo edição ativado para o produto ID " + produto.id, "ok")
+      formTitle.textContent = "Editar produto"
+
+      mostrarStatus(produtoStatus, "Modo edição ativado para o produto ID " + produto.id, "warn")
       window.scrollTo({ top: 0, behavior: "smooth" })
     }
 
@@ -588,7 +659,12 @@
           return
         }
 
-        mostrarStatus(produtoStatus, id ? "Produto atualizado com sucesso." : "Produto criado com sucesso.", "ok")
+        mostrarStatus(
+          produtoStatus,
+          id ? "Produto atualizado com sucesso." : "Produto criado com sucesso.",
+          "ok"
+        )
+
         limparFormularioProduto()
         carregarProdutos()
       } catch (error) {
@@ -632,6 +708,9 @@
       limparStatus(loginStatus)
       limparStatus(produtoStatus)
       produtosWrap.innerHTML = ""
+      totalProdutosPill.textContent = "Produtos: 0"
+      estoqueTotalPill.textContent = "Estoque total: 0"
+      senhaInput.value = ""
     }
 
     btnLogin.addEventListener("click", login)
