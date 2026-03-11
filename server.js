@@ -15,7 +15,6 @@ app.use(cors({
 }))
 
 app.options("*", cors())
-
 app.use(express.json())
 
 const supabase = createClient(
@@ -74,6 +73,13 @@ app.get("/", (req, res) => {
   })
 })
 
+app.get("/teste-login", (req, res) => {
+  res.json({
+    rota: "/login ativa",
+    metodo: "POST"
+  })
+})
+
 app.get("/produtos", async (req, res) => {
   try {
     const { data, error } = await supabase
@@ -87,7 +93,7 @@ app.get("/produtos", async (req, res) => {
 
     res.json(data)
   } catch (error) {
-    res.status(500).json({ erro: "Erro interno ao buscar produtos" })
+    res.status(500).json({ erro: "Erro ao buscar produtos" })
   }
 })
 
@@ -131,7 +137,7 @@ app.post("/login", async (req, res) => {
   }
 })
 
-app.get("/me", autenticarToken, async (req, res) => {
+app.get("/me", autenticarToken, (req, res) => {
   res.json({
     usuario: req.usuario
   })
