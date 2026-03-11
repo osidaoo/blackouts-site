@@ -98,11 +98,10 @@ app.post("/login", async (req, res) => {
     }
 
     const { data, error } = await supabase
-      .from("Usuários")
-      .select("*")
-      .eq("e-mail", email)
-      .single()
-
+        .from("Usuários")
+       .select("*")
+       .ilike("e-mail", email)
+       .single()
     if (error || !data) {
       return res.status(401).json({ erro: "Usuário não encontrado" })
     }
