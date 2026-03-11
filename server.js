@@ -246,6 +246,51 @@ app.delete("/admin/produtos/:id", autenticarToken, somenteAdmin, async (req, res
   }
 })
 
+app.post("/pedidos", async (req, res) => {
+  try {
+    const { produto_id, nome_cliente, email_cliente } = req.body
+
+    if (!produto_id || !nome_cliente || !email_cliente) {
+      return res.status(400).json({ erro: "Produto, nome e email são obrigatórios" })
+    }
+
+    const { data: produto, error: erroProduto } = await supabase
+      .from("produtos")
+      .select("*")
+      .eq("id", produto_id)
+      .single()
+
+    if (erroProduto || !produto) {
+      return res.status(404).json({ erro: "Produto não encontrado" })
+    }
+
+    const { data, error } = await supabase
+      .from("pedidos")
+      .insert([
+        {
+          produto_id: produto.id,
+          produto_nome: produto.nome,
+          preco: Number(produto.preco),
+          nome_cliente,
+          email_cliente,
+          status: "pendente"
+        }
+      ])
+      .select()
+
+    if (error) {
+      return res.status(500).json({ erro: error.message })
+    }
+
+    res.json({
+      sucesso: true,
+      pedido: data[0]
+    })
+  } catch (error) {
+    res.status(500).json({ erro: "Erro ao criar pedido" })
+  }
+})
+
 app.listen(PORT, () => {
   console.log("Servidor rodando na porta", PORT)
 })
