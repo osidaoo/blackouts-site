@@ -362,6 +362,13 @@
       line-height:1.1;
     }
 
+    .product-body p{
+      margin:14px 0 0;
+      color:var(--muted);
+      line-height:1.6;
+      font-size:15px;
+    }
+
     .product-price{
       margin-top:18px;
       font-size:29px;
@@ -590,64 +597,12 @@
     <section id="produtos" class="section">
       <div class="products-head">
         <div>
-          <h2 class="section-title">Destaques</h2>
-          <p>Produtos em destaque com entrega automática.</p>
+          <h2 class="section-title">Produtos em destaque</h2>
+          <p>Compre contas, keys e assinaturas com entrega automática.</p>
         </div>
       </div>
 
-      <div class="product-grid">
-        <article class="product-card">
-          <div class="product-banner">
-            <span class="product-tag">Mais vendida</span>
-            <span class="product-number">1</span>
-          </div>
-          <div class="product-body">
-            <h3>Conta Fortnite FA</h3>
-            <div class="product-price">R$ 29,90</div>
-            <div class="product-stock">12 em estoque</div>
-            <button class="product-btn">Comprar</button>
-          </div>
-        </article>
-
-        <article class="product-card">
-          <div class="product-banner">
-            <span class="product-tag">Novo</span>
-            <span class="product-number">2</span>
-          </div>
-          <div class="product-body">
-            <h3>Netflix Premium</h3>
-            <div class="product-price">R$ 12,90</div>
-            <div class="product-stock">Disponível</div>
-            <button class="product-btn">Comprar</button>
-          </div>
-        </article>
-
-        <article class="product-card">
-          <div class="product-banner">
-            <span class="product-tag">Barato</span>
-            <span class="product-number">3</span>
-          </div>
-          <div class="product-body">
-            <h3>Steam Key Aleatória</h3>
-            <div class="product-price">R$ 7,90</div>
-            <div class="product-stock">21 em estoque</div>
-            <button class="product-btn">Comprar</button>
-          </div>
-        </article>
-
-        <article class="product-card">
-          <div class="product-banner">
-            <span class="product-tag">Popular</span>
-            <span class="product-number">4</span>
-          </div>
-          <div class="product-body">
-            <h3>Discord Nitro</h3>
-            <div class="product-price">R$ 14,90</div>
-            <div class="product-stock">8 em estoque</div>
-            <button class="product-btn">Comprar</button>
-          </div>
-        </article>
-      </div>
+      <div class="product-grid" id="lista-produtos"></div>
     </section>
 
     <section id="suporte" class="section">
@@ -679,5 +634,47 @@
       © Blackouts — loja digital com identidade premium
     </footer>
   </main>
+
+  <script>
+    async function carregarProdutos() {
+      try {
+        const resposta = await fetch("http://localhost:3000/produtos");
+        const produtos = await resposta.json();
+
+        const lista = document.getElementById("lista-produtos");
+        lista.innerHTML = "";
+
+        produtos.forEach((produto, index) => {
+          const card = document.createElement("article");
+          card.className = "product-card";
+
+          card.innerHTML = `
+            <div class="product-banner">
+              <span class="product-tag">Produto</span>
+              <span class="product-number">${index + 1}</span>
+            </div>
+
+            <div class="product-body">
+              <h3>${produto.nome}</h3>
+              <p>${produto.descricao || ""}</p>
+              <div class="product-price">
+                R$ ${Number(produto.preco).toFixed(2).replace(".", ",")}
+              </div>
+              <div class="product-stock">
+                ${produto.estoque} em estoque
+              </div>
+              <button class="product-btn">Comprar</button>
+            </div>
+          `;
+
+          lista.appendChild(card);
+        });
+      } catch (erro) {
+        console.error("Erro ao carregar produtos", erro);
+      }
+    }
+
+    carregarProdutos();
+  </script>
 </body>
 </html>
