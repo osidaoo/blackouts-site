@@ -472,14 +472,100 @@ app.post("/pedidos", async (req, res) => {
 })
 
 app.post("/webhook/mercadopago", async (req, res) => {
+
   try {
-    console.log("Webhook Mercado Pago recebido:", req.body)
-    return res.status(200).send("ok")
+
+    const paymentId = req.body?.data?.id
+
+    if (!paymentId) {
+      return res.status(200).send("ok")
+    }
+
+    const mpResponse = await fetch(
+      `https://api.mercadopago.com/v1/payments/${paymentId}`,
+      {
+        headers: {
+          Authorization: `Bearer ${process.env.MP_ACCESS_TOKEN}`
+        }
+      }
+    )
+
+    const pagamento = await mpResponse.json()
+
+    if (pagamento.status !== "approved") {
+      return res.status(200).send("ok")
+    }
+
+    const pedidoId = Number(pagamento.external_reference)
+
+    if (!pedidoId) {
+      return res.status(200).send("ok")
+    }
+
+    const { data: pedido } = await supabase
+      .from("pedidos")
+      .select("*")
+      .eq("id", pedidoId)
+      .single()
+
+    if (!pedido) {
+      return res.status(200).send("ok")
+    }
+
+    if (pedido.status === "pago") {
+      return res.status(200).send("ok")
+    }
+
+    const { data: conta } = await supabase
+      .from("contas_digitais")
+      .select("*")
+      .eq("produto_id", pedido.produto_id)
+      .eq("status", "disponivel")
+      .limit(1)
+      .single()
+
+    if (!conta) {
+      console.log("SEM ESTOQUE")
+      return res.status(200).send("ok")
+    }
+
+    await supabase
+      .from("contas_digitais")
+      .update({
+        status: "vendida"
+      })
+      .eq("id", conta.id)
+
+    await supabase
+      .from("pedidos")
+      .update({
+        status: "pago",
+        conta_entregue_id: conta.id
+      })
+      .eq("id", pedido.id)
+
+    await supabase
+      .from("pagamentos")
+      .update({
+        status: "approved"
+      })
+      .eq("mp_payment_id", String(paymentId))
+
+    console.log("CONTA ENTREGUE:", conta.login)
+
+    res.status(200).send("ok")
+
   } catch (error) {
-    return res.status(500).send("erro")
+
+    console.log("Erro webhook:", error)
+
+    res.status(500).send("erro")
+
   }
+
 })
 
 app.listen(PORT, () => {
   console.log("Servidor rodando na porta", PORT)
 })
+
