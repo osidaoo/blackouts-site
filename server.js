@@ -464,17 +464,65 @@ app.post("/pedidos", async (req, res) => {
       pix: {
         qr_code: qrCode,
         qr_code_base64: qrCodeBase64
-      }
+      },
+      entrega_url: `https://blackouts-site.vercel.app/entrega.html?pedido=${pedido.id}&email=${encodeURIComponent(email_cliente)}`
     })
   } catch (error) {
     res.status(500).json({ erro: "Erro ao criar pedido com PIX" })
   }
 })
 
-app.post("/webhook/mercadopago", async (req, res) => {
-
+app.get("/pedido-status", async (req, res) => {
   try {
+    const pedidoId = Number(req.query.pedido)
+    const email = String(req.query.email || "").trim().toLowerCase()
 
+    if (!pedidoId || !email) {
+      return res.status(400).json({ erro: "Pedido e email são obrigatórios" })
+    }
+
+    const { data: pedido, error: erroPedido } = await supabase
+      .from("pedidos")
+      .select("*")
+      .eq("id", pedidoId)
+      .ilike("email_cliente", email)
+      .single()
+
+    if (erroPedido || !pedido) {
+      return res.status(404).json({ erro: "Pedido não encontrado" })
+    }
+
+    let entrega = null
+
+    if (pedido.conta_entregue_id) {
+      const { data: conta } = await supabase
+        .from("contas_digitais")
+        .select("id, login, senha, status")
+        .eq("id", pedido.conta_entregue_id)
+        .single()
+
+      if (conta) {
+        entrega = conta
+      }
+    }
+
+    res.json({
+      pedido: {
+        id: pedido.id,
+        status: pedido.status,
+        produto_nome: pedido.produto_nome,
+        preco: pedido.preco,
+        criado_em: pedido.criado_em
+      },
+      entrega
+    })
+  } catch (error) {
+    res.status(500).json({ erro: "Erro ao consultar pedido" })
+  }
+})
+
+app.post("/webhook/mercadopago", async (req, res) => {
+  try {
     const paymentId = req.body?.data?.id
 
     if (!paymentId) {
@@ -521,18 +569,20 @@ app.post("/webhook/mercadopago", async (req, res) => {
       .select("*")
       .eq("produto_id", pedido.produto_id)
       .eq("status", "disponivel")
+      .order("id", { ascending: true })
       .limit(1)
       .single()
 
     if (!conta) {
-      console.log("SEM ESTOQUE")
+      console.log("SEM ESTOQUE PARA ENTREGAR")
       return res.status(200).send("ok")
     }
 
     await supabase
       .from("contas_digitais")
       .update({
-        status: "vendida"
+        status: "vendida",
+        pedido_id: pedido.id
       })
       .eq("id", conta.id)
 
@@ -553,19 +603,13 @@ app.post("/webhook/mercadopago", async (req, res) => {
 
     console.log("CONTA ENTREGUE:", conta.login)
 
-    res.status(200).send("ok")
-
+    return res.status(200).send("ok")
   } catch (error) {
-
     console.log("Erro webhook:", error)
-
-    res.status(500).send("erro")
-
+    return res.status(500).send("erro")
   }
-
 })
 
 app.listen(PORT, () => {
   console.log("Servidor rodando na porta", PORT)
 })
-
