@@ -192,6 +192,18 @@ margin-top:10px;
 .copy-btn{
 margin-top:10px;
 }
+.link-entrega{
+margin-top:14px;
+padding:14px;
+border-radius:14px;
+background:rgba(61,220,151,.08);
+border:1px solid rgba(61,220,151,.18);
+display:none;
+word-break:break-word;
+}
+.link-entrega a{
+color:#bdf5dc;
+}
 </style>
 </head>
 <body>
@@ -241,6 +253,8 @@ margin-top:10px;
         A conta será liberada somente após confirmação do pagamento.
       </div>
     </div>
+
+    <div id="linkEntrega" class="link-entrega"></div>
   </div>
 </div>
 
@@ -285,6 +299,8 @@ function abrirModal(produtoId){
   document.getElementById("pixBox").style.display = "none"
   document.getElementById("pixQrImage").src = ""
   document.getElementById("pixCode").value = ""
+  document.getElementById("linkEntrega").style.display = "none"
+  document.getElementById("linkEntrega").innerHTML = ""
 }
 
 function fecharModal(){
@@ -296,6 +312,8 @@ function fecharModal(){
   document.getElementById("pixBox").style.display = "none"
   document.getElementById("pixQrImage").src = ""
   document.getElementById("pixCode").value = ""
+  document.getElementById("linkEntrega").style.display = "none"
+  document.getElementById("linkEntrega").innerHTML = ""
 }
 
 function mostrarStatusPedido(texto, tipo){
@@ -340,7 +358,7 @@ async function enviarPedido(){
       return
     }
 
-    mostrarStatusPedido("Pix gerado com sucesso. Faça o pagamento para liberar a conta.", "ok")
+    mostrarStatusPedido("Pix gerado com sucesso. Faça o pagamento e acompanhe a entrega pelo link abaixo.", "ok")
 
     if(dados.pix){
       if(dados.pix.qr_code_base64){
@@ -349,6 +367,15 @@ async function enviarPedido(){
 
       document.getElementById("pixCode").value = dados.pix.qr_code || ""
       document.getElementById("pixBox").style.display = "block"
+    }
+
+    if(dados.entrega_url){
+      const box = document.getElementById("linkEntrega")
+      box.innerHTML = `
+        <strong>Link de acompanhamento da entrega:</strong><br><br>
+        <a href="${dados.entrega_url}" target="_blank">${dados.entrega_url}</a>
+      `
+      box.style.display = "block"
     }
 
   }catch(e){
