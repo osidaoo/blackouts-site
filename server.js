@@ -17,6 +17,7 @@ const supabase = createClient(
 )
 
 const PORT = process.env.PORT || 3000
+const MP_ACCESS_TOKEN = process.env.MP_ACCESS_TOKEN
 
 function gerarToken(usuario) {
   return jwt.sign(
@@ -152,6 +153,60 @@ app.get("/me", autenticarToken, (req, res) => {
   })
 })
 
+app.get("/admin/dashboard", autenticarToken, somenteAdmin, async (req, res) => {
+  try {
+    const { data: produtos, error: erroProdutos } = await supabase
+      .from("produtos")
+      .select("*")
+
+    if (erroProdutos) {
+      return res.status(500).json({ erro: erroProdutos.message })
+    }
+
+    const { data: pedidos, error: erroPedidos } = await supabase
+      .from("pedidos")
+      .select("*")
+
+    if (erroPedidos) {
+      return res.status(500).json({ erro: erroPedidos.message })
+    }
+
+    const hoje = new Date()
+    const inicioHoje = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate())
+
+    const pedidosLista = pedidos || []
+    const produtosLista = produtos || []
+
+    const pedidosHoje = pedidosLista.filter((pedido) => {
+      if (!pedido.criado_em) return false
+      return new Date(pedido.criado_em) >= inicioHoje
+    })
+
+    const faturamentoTotal = pedidosLista.reduce((total, pedido) => {
+      return total + Number(pedido.preco || 0)
+    }, 0)
+
+    const faturamentoHoje = pedidosHoje.reduce((total, pedido) => {
+      return total + Number(pedido.preco || 0)
+    }, 0)
+
+    const estoqueTotal = produtosLista.reduce((total, produto) => {
+      return total + Number(produto.estoque || 0)
+    }, 0)
+
+    res.json({
+      pedidos_totais: pedidosLista.length,
+      faturamento_total: faturamentoTotal,
+      pedidos_hoje: pedidosHoje.length,
+      faturamento_hoje: faturamentoHoje,
+      produtos_totais: produtosLista.length,
+      estoque_total: estoqueTotal
+    })
+  } catch (error) {
+    res.status(500).json({ erro: "Erro ao carregar dashboard" })
+  }
+})
+
 app.get("/admin/produtos", autenticarToken, somenteAdmin, async (req, res) => {
   try {
     const { data, error } = await supabase
@@ -246,6 +301,70 @@ app.delete("/admin/produtos/:id", autenticarToken, somenteAdmin, async (req, res
   }
 })
 
+app.get("/admin/pedidos", autenticarToken, somenteAdmin, async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from("pedidos")
+      .select("*")
+      .order("criado_em", { ascending: false })
+
+    if (error) {
+      return res.status(500).json({ erro: error.message })
+    }
+
+    res.json(data)
+  } catch (error) {
+    res.status(500).json({ erro: "Erro ao buscar pedidos" })
+  }
+})
+
+app.get("/admin/contas", autenticarToken, somenteAdmin, async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from("contas_digitais")
+      .select("*")
+      .order("id", { ascending: false })
+
+    if (error) {
+      return res.status(500).json({ erro: error.message })
+    }
+
+    res.json(data)
+  } catch (error) {
+    res.status(500).json({ erro: "Erro ao buscar contas" })
+  }
+})
+
+app.post("/admin/contas", autenticarToken, somenteAdmin, async (req, res) => {
+  try {
+    const { produto_id, login, senha } = req.body
+
+    if (!produto_id || !login || !senha) {
+      return res.status(400).json({ erro: "Produto, login e senha são obrigatórios" })
+    }
+
+    const { data, error } = await supabase
+      .from("contas_digitais")
+      .insert([
+        {
+          produto_id: Number(produto_id),
+          login,
+          senha,
+          status: "disponivel"
+        }
+      ])
+      .select()
+
+    if (error) {
+      return res.status(500).json({ erro: error.message })
+    }
+
+    res.json(data)
+  } catch (error) {
+    res.status(500).json({ erro: "Erro ao cadastrar conta" })
+  }
+})
+
 app.post("/pedidos", async (req, res) => {
   try {
     const { produto_id, nome_cliente, email_cliente } = req.body
@@ -264,7 +383,7 @@ app.post("/pedidos", async (req, res) => {
       return res.status(404).json({ erro: "Produto não encontrado" })
     }
 
-    const { data, error } = await supabase
+    const { data: pedidoInserido, error: erroPedido } = await supabase
       .from("pedidos")
       .insert([
         {
@@ -273,75 +392,91 @@ app.post("/pedidos", async (req, res) => {
           preco: Number(produto.preco),
           nome_cliente,
           email_cliente,
-          status: "pendente"
+          status: "aguardando_pagamento"
         }
       ])
       .select()
 
-    if (error) {
-      return res.status(500).json({ erro: error.message })
+    if (erroPedido || !pedidoInserido || !pedidoInserido[0]) {
+      return res.status(500).json({ erro: erroPedido?.message || "Erro ao criar pedido" })
+    }
+
+    const pedido = pedidoInserido[0]
+
+    if (!MP_ACCESS_TOKEN) {
+      return res.status(500).json({ erro: "Mercado Pago não configurado" })
+    }
+
+    const mpResponse = await fetch("https://api.mercadopago.com/v1/payments", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${MP_ACCESS_TOKEN}`,
+        "X-Idempotency-Key": `pedido-${pedido.id}-${Date.now()}`
+      },
+      body: JSON.stringify({
+        transaction_amount: Number(produto.preco),
+        description: produto.nome,
+        payment_method_id: "pix",
+        notification_url: "https://blackouts-site.onrender.com/webhook/mercadopago",
+        payer: {
+          email: email_cliente,
+          first_name: nome_cliente
+        },
+        external_reference: String(pedido.id)
+      })
+    })
+
+    const mpData = await mpResponse.json()
+
+    if (!mpResponse.ok) {
+      return res.status(500).json({
+        erro: "Erro ao gerar PIX no Mercado Pago",
+        detalhe: mpData
+      })
+    }
+
+    const qrCode = mpData?.point_of_interaction?.transaction_data?.qr_code || null
+    const qrCodeBase64 = mpData?.point_of_interaction?.transaction_data?.qr_code_base64 || null
+
+    const { error: erroPagamento } = await supabase
+      .from("pagamentos")
+      .insert([
+        {
+          pedido_id: pedido.id,
+          mp_payment_id: String(mpData.id),
+          status: mpData.status || "pending",
+          qr_code: qrCode,
+          qr_code_base64: qrCodeBase64,
+          valor: Number(produto.preco)
+        }
+      ])
+
+    if (erroPagamento) {
+      return res.status(500).json({ erro: erroPagamento.message })
     }
 
     res.json({
       sucesso: true,
-      pedido: data[0]
+      pedido_id: pedido.id,
+      pagamento_id: mpData.id,
+      status: mpData.status,
+      pix: {
+        qr_code: qrCode,
+        qr_code_base64: qrCodeBase64
+      }
     })
   } catch (error) {
-    res.status(500).json({ erro: "Erro ao criar pedido" })
+    res.status(500).json({ erro: "Erro ao criar pedido com PIX" })
   }
 })
 
-app.get("/admin/dashboard", autenticarToken, somenteAdmin, async (req, res) => {
+app.post("/webhook/mercadopago", async (req, res) => {
   try {
-    const { data: produtos, error: erroProdutos } = await supabase
-      .from("produtos")
-      .select("*")
-
-    if (erroProdutos) {
-      return res.status(500).json({ erro: erroProdutos.message })
-    }
-
-    const { data: pedidos, error: erroPedidos } = await supabase
-      .from("pedidos")
-      .select("*")
-
-    if (erroPedidos) {
-      return res.status(500).json({ erro: erroPedidos.message })
-    }
-
-    const hoje = new Date()
-    const inicioHoje = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate())
-
-    const pedidosLista = pedidos || []
-    const produtosLista = produtos || []
-
-    const pedidosHoje = pedidosLista.filter((pedido) => {
-      if (!pedido.criado_em) return false
-      return new Date(pedido.criado_em) >= inicioHoje
-    })
-
-    const faturamentoTotal = pedidosLista.reduce((total, pedido) => {
-      return total + Number(pedido.preco || 0)
-    }, 0)
-
-    const faturamentoHoje = pedidosHoje.reduce((total, pedido) => {
-      return total + Number(pedido.preco || 0)
-    }, 0)
-
-    const estoqueTotal = produtosLista.reduce((total, produto) => {
-      return total + Number(produto.estoque || 0)
-    }, 0)
-
-    res.json({
-      pedidos_totais: pedidosLista.length,
-      faturamento_total: faturamentoTotal,
-      pedidos_hoje: pedidosHoje.length,
-      faturamento_hoje: faturamentoHoje,
-      produtos_totais: produtosLista.length,
-      estoque_total: estoqueTotal
-    })
+    console.log("Webhook Mercado Pago recebido:", req.body)
+    return res.status(200).send("ok")
   } catch (error) {
-    res.status(500).json({ erro: "Erro ao carregar dashboard" })
+    return res.status(500).send("erro")
   }
 })
 
