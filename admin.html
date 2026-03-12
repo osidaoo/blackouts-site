@@ -85,8 +85,25 @@
       gap:20px;
     }
 
+    .grid-dashboard{
+      display:grid;
+      grid-template-columns:repeat(3, 1fr);
+      gap:16px;
+      margin-bottom:20px;
+    }
+
+    @media (max-width: 1100px){
+      .grid-dashboard{
+        grid-template-columns:repeat(2, 1fr);
+      }
+    }
+
     @media (max-width: 960px){
       .grid{
+        grid-template-columns:1fr;
+      }
+
+      .grid-dashboard{
         grid-template-columns:1fr;
       }
     }
@@ -290,6 +307,28 @@
       color:#ffd6de;
       border-color:rgba(255,95,122,.22);
     }
+
+    .stat-card{
+      background:var(--panel);
+      border:1px solid var(--line);
+      border-radius:18px;
+      padding:20px;
+      box-shadow:var(--shadow);
+    }
+
+    .stat-label{
+      font-size:13px;
+      color:var(--muted);
+      margin-bottom:10px;
+      text-transform:uppercase;
+      letter-spacing:.6px;
+    }
+
+    .stat-value{
+      font-size:28px;
+      font-weight:900;
+      color:var(--primary2);
+    }
   </style>
 </head>
 <body>
@@ -297,7 +336,7 @@
     <div class="topbar">
       <div>
         <div class="brand">BLACKOUTS ADMIN</div>
-        <div class="subtitle">Painel de controle de produtos e pedidos</div>
+        <div class="subtitle">Painel de controle, pedidos e faturamento</div>
       </div>
 
       <div class="btn-row">
@@ -320,6 +359,38 @@
     </div>
 
     <div id="adminArea" class="hidden">
+      <div class="grid-dashboard">
+        <div class="stat-card">
+          <div class="stat-label">Pedidos totais</div>
+          <div class="stat-value" id="statPedidosTotais">0</div>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-label">Faturamento total</div>
+          <div class="stat-value" id="statFaturamentoTotal">R$ 0,00</div>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-label">Pedidos hoje</div>
+          <div class="stat-value" id="statPedidosHoje">0</div>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-label">Faturamento hoje</div>
+          <div class="stat-value" id="statFaturamentoHoje">R$ 0,00</div>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-label">Produtos cadastrados</div>
+          <div class="stat-value" id="statProdutosTotais">0</div>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-label">Estoque total</div>
+          <div class="stat-value" id="statEstoqueTotal">0</div>
+        </div>
+      </div>
+
       <div class="grid">
         <div class="card">
           <h2 id="formTitle">Cadastrar produto</h2>
@@ -363,6 +434,7 @@
           </div>
 
           <div class="btn-row">
+            <button id="btnAtualizarDashboard" class="btn btn-secondary">Atualizar dashboard</button>
             <button id="btnAtualizar" class="btn btn-secondary">Atualizar produtos</button>
           </div>
         </div>
@@ -402,6 +474,7 @@
     const btnCancelarEdicao = document.getElementById("btnCancelarEdicao")
     const btnAtualizar = document.getElementById("btnAtualizar")
     const btnAtualizarPedidos = document.getElementById("btnAtualizarPedidos")
+    const btnAtualizarDashboard = document.getElementById("btnAtualizarDashboard")
 
     const loginStatus = document.getElementById("loginStatus")
     const produtoStatus = document.getElementById("produtoStatus")
@@ -412,6 +485,13 @@
     const estoqueTotalPill = document.getElementById("estoqueTotalPill")
     const totalPedidosPill = document.getElementById("totalPedidosPill")
     const formTitle = document.getElementById("formTitle")
+
+    const statPedidosTotais = document.getElementById("statPedidosTotais")
+    const statFaturamentoTotal = document.getElementById("statFaturamentoTotal")
+    const statPedidosHoje = document.getElementById("statPedidosHoje")
+    const statFaturamentoHoje = document.getElementById("statFaturamentoHoje")
+    const statProdutosTotais = document.getElementById("statProdutosTotais")
+    const statEstoqueTotal = document.getElementById("statEstoqueTotal")
 
     const emailInput = document.getElementById("email")
     const senhaInput = document.getElementById("senha")
@@ -453,6 +533,13 @@
     function ehAdmin(papel) {
       const valor = String(papel || "").toLowerCase()
       return valor === "admin" || valor === "administrador"
+    }
+
+    function formatarMoeda(valor) {
+      return Number(valor || 0).toLocaleString("pt-BR", {
+        style: "currency",
+        currency: "BRL"
+      })
     }
 
     function mostrarTelaAdmin() {
@@ -528,6 +615,7 @@
         mostrarStatus(loginStatus, "Login realizado com sucesso.", "ok")
 
         mostrarTelaAdmin()
+        carregarDashboard()
         carregarProdutos()
         carregarPedidos()
       } catch (error) {
@@ -565,12 +653,36 @@
         }
 
         mostrarTelaAdmin()
+        carregarDashboard()
         carregarProdutos()
         carregarPedidos()
       } catch (error) {
         limparSessao()
         mostrarTelaLogin()
       }
+    }
+
+    async function carregarDashboard() {
+      try {
+        const resposta = await fetch(API_URL + "/admin/dashboard", {
+          headers: {
+            Authorization: "Bearer " + getToken()
+          }
+        })
+
+        const dados = await lerRespostaSegura(resposta)
+
+        if (!resposta.ok) {
+          return
+        }
+
+        statPedidosTotais.textContent = dados.pedidos_totais ?? 0
+        statFaturamentoTotal.textContent = formatarMoeda(dados.faturamento_total ?? 0)
+        statPedidosHoje.textContent = dados.pedidos_hoje ?? 0
+        statFaturamentoHoje.textContent = formatarMoeda(dados.faturamento_hoje ?? 0)
+        statProdutosTotais.textContent = dados.produtos_totais ?? 0
+        statEstoqueTotal.textContent = dados.estoque_total ?? 0
+      } catch (error) {}
     }
 
     function atualizarResumoProdutos(produtos) {
@@ -633,7 +745,7 @@
             <tr>
               <td>${produto.id}</td>
               <td>${produto.nome ?? ""}</td>
-              <td>R$ ${Number(produto.preco ?? 0).toFixed(2)}</td>
+              <td>${formatarMoeda(produto.preco ?? 0)}</td>
               <td class="${classeEstoque}">${estoqueNumero}</td>
               <td>
                 <div class="produto-actions">
@@ -716,7 +828,7 @@
               <td>${pedido.produto_nome ?? "-"}</td>
               <td>${pedido.nome_cliente ?? "-"}</td>
               <td>${pedido.email_cliente ?? "-"}</td>
-              <td>R$ ${Number(pedido.preco ?? 0).toFixed(2)}</td>
+              <td>${formatarMoeda(pedido.preco ?? 0)}</td>
               <td><span class="status-pill ${classeStatus}">${pedido.status ?? "pendente"}</span></td>
               <td>${dataFormatada}</td>
             </tr>
@@ -796,6 +908,7 @@
         )
 
         limparFormularioProduto()
+        carregarDashboard()
         carregarProdutos()
       } catch (error) {
         mostrarStatus(produtoStatus, "Erro ao conectar com a API.", "error")
@@ -825,6 +938,7 @@
         }
 
         alert("Produto excluído com sucesso.")
+        carregarDashboard()
         carregarProdutos()
       } catch (error) {
         alert("Erro ao conectar com a API.")
@@ -842,6 +956,12 @@
       totalProdutosPill.textContent = "Produtos: 0"
       estoqueTotalPill.textContent = "Estoque total: 0"
       totalPedidosPill.textContent = "Pedidos: 0"
+      statPedidosTotais.textContent = "0"
+      statFaturamentoTotal.textContent = "R$ 0,00"
+      statPedidosHoje.textContent = "0"
+      statFaturamentoHoje.textContent = "R$ 0,00"
+      statProdutosTotais.textContent = "0"
+      statEstoqueTotal.textContent = "0"
       senhaInput.value = ""
     }
 
@@ -853,6 +973,7 @@
     })
     btnAtualizar.addEventListener("click", carregarProdutos)
     btnAtualizarPedidos.addEventListener("click", carregarPedidos)
+    btnAtualizarDashboard.addEventListener("click", carregarDashboard)
     btnLogoutTop.addEventListener("click", logout)
 
     verificarSessao()
