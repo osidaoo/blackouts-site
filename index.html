@@ -112,7 +112,7 @@ padding:20px;
 }
 .modal{
 width:100%;
-max-width:460px;
+max-width:520px;
 background:var(--panel);
 border:1px solid var(--line);
 border-radius:24px;
@@ -162,44 +162,62 @@ background:rgba(255,255,255,.08);
 color:#fff;
 border:1px solid rgba(255,255,255,.12);
 }
-.entrega-box{
+.pix-box{
 margin-top:16px;
 padding:16px;
 border-radius:16px;
-background:rgba(61,220,151,.08);
-border:1px solid rgba(61,220,151,.18);
+background:rgba(78,161,255,.08);
+border:1px solid rgba(78,161,255,.18);
+display:none;
 }
-.entrega-box strong{
-color:#bdf5dc;
+.pix-box img{
+width:220px;
+max-width:100%;
+display:block;
+margin:12px auto;
+background:#fff;
+padding:8px;
+border-radius:12px;
+}
+.pix-code{
+width:100%;
+min-height:120px;
+padding:12px;
+border-radius:12px;
+border:1px solid rgba(255,255,255,.12);
+background:rgba(255,255,255,.04);
+color:#fff;
+margin-top:10px;
+}
+.copy-btn{
+margin-top:10px;
 }
 </style>
 </head>
 <body>
 
 <div class="container">
+  <div class="header">
+    <div>
+      <div class="logo">BLACKOUTS</div>
+      <div class="subtitle">Loja oficial</div>
+    </div>
+  </div>
 
-<div class="header">
-<div>
-<div class="logo">BLACKOUTS</div>
-<div class="subtitle">Loja oficial</div>
-</div>
-</div>
+  <h2 style="margin-bottom:20px;">Produtos disponíveis</h2>
 
-<h2 style="margin-bottom:20px;">Produtos disponíveis</h2>
+  <div id="produtos" class="grid">
+    <div class="loading">Carregando produtos...</div>
+  </div>
 
-<div id="produtos" class="grid">
-<div class="loading">Carregando produtos...</div>
-</div>
-
-<div class="footer">
-Blackouts © 2026
-</div>
-
+  <div class="footer">
+    Blackouts © 2026
+  </div>
 </div>
 
 <div id="modalBg" class="modal-bg">
   <div class="modal">
-    <h3>Finalizar pedido</h3>
+    <h3>Finalizar pedido com Pix</h3>
 
     <input type="hidden" id="produtoIdPedido">
 
@@ -207,12 +225,22 @@ Blackouts © 2026
     <input id="emailCliente" type="email" placeholder="Seu e-mail">
 
     <div class="btn-row">
-      <button class="btn" onclick="enviarPedido()">Confirmar pedido</button>
+      <button class="btn" onclick="enviarPedido()">Gerar Pix</button>
       <button class="btn btn-secondary" onclick="fecharModal()">Cancelar</button>
     </div>
 
     <div id="pedidoStatus" class="status"></div>
-    <div id="entregaBox" class="entrega-box" style="display:none;"></div>
+
+    <div id="pixBox" class="pix-box">
+      <strong>Pagamento Pix gerado</strong>
+      <img id="pixQrImage" alt="QR Code Pix">
+      <div style="margin-top:10px;">Copia e cola Pix:</div>
+      <textarea id="pixCode" class="pix-code" readonly></textarea>
+      <button class="btn copy-btn" onclick="copiarPix()">Copiar código Pix</button>
+      <div style="margin-top:12px; color:#aab5d6; font-size:13px;">
+        A conta será liberada somente após confirmação do pagamento.
+      </div>
+    </div>
   </div>
 </div>
 
@@ -237,18 +265,9 @@ async function carregarProdutos(){
       html += `
         <div class="card">
           <h3>${produto.nome}</h3>
-
-          <div class="price">
-            R$ ${Number(produto.preco).toFixed(2)}
-          </div>
-
-          <div class="stock">
-            Estoque: ${produto.estoque}
-          </div>
-
-          <button class="btn" onclick="abrirModal(${produto.id})">
-            Comprar
-          </button>
+          <div class="price">R$ ${Number(produto.preco).toFixed(2)}</div>
+          <div class="stock">Estoque: ${produto.estoque}</div>
+          <button class="btn" onclick="abrirModal(${produto.id})">Comprar</button>
         </div>
       `
     })
@@ -263,8 +282,9 @@ function abrirModal(produtoId){
   document.getElementById("produtoIdPedido").value = produtoId
   document.getElementById("modalBg").style.display = "flex"
   limparStatusPedido()
-  document.getElementById("entregaBox").style.display = "none"
-  document.getElementById("entregaBox").innerHTML = ""
+  document.getElementById("pixBox").style.display = "none"
+  document.getElementById("pixQrImage").src = ""
+  document.getElementById("pixCode").value = ""
 }
 
 function fecharModal(){
@@ -273,8 +293,9 @@ function fecharModal(){
   document.getElementById("nomeCliente").value = ""
   document.getElementById("emailCliente").value = ""
   limparStatusPedido()
-  document.getElementById("entregaBox").style.display = "none"
-  document.getElementById("entregaBox").innerHTML = ""
+  document.getElementById("pixBox").style.display = "none"
+  document.getElementById("pixQrImage").src = ""
+  document.getElementById("pixCode").value = ""
 }
 
 function mostrarStatusPedido(texto, tipo){
@@ -293,10 +314,6 @@ async function enviarPedido(){
   const produto_id = Number(document.getElementById("produtoIdPedido").value)
   const nome_cliente = document.getElementById("nomeCliente").value.trim()
   const email_cliente = document.getElementById("emailCliente").value.trim()
-  const entregaBox = document.getElementById("entregaBox")
-
-  entregaBox.style.display = "none"
-  entregaBox.innerHTML = ""
 
   if(!produto_id || !nome_cliente || !email_cliente){
     mostrarStatusPedido("Preencha nome e email.", "error")
@@ -319,26 +336,38 @@ async function enviarPedido(){
     const dados = await res.json()
 
     if(!res.ok){
-      mostrarStatusPedido(dados.erro || "Erro ao criar pedido.", "error")
+      mostrarStatusPedido(dados.erro || "Erro ao gerar pedido Pix.", "error")
       return
     }
 
-    mostrarStatusPedido("Pedido criado com sucesso. Entrega liberada abaixo.", "ok")
+    mostrarStatusPedido("Pix gerado com sucesso. Faça o pagamento para liberar a conta.", "ok")
 
-    if(dados.entrega){
-      entregaBox.innerHTML = `
-        <strong>Conta entregue com sucesso</strong><br><br>
-        Login: <strong>${dados.entrega.login}</strong><br>
-        Senha: <strong>${dados.entrega.senha}</strong><br><br>
-        Guarde esses dados com segurança.
-      `
-      entregaBox.style.display = "block"
+    if(dados.pix){
+      if(dados.pix.qr_code_base64){
+        document.getElementById("pixQrImage").src = "data:image/png;base64," + dados.pix.qr_code_base64
+      }
+
+      document.getElementById("pixCode").value = dados.pix.qr_code || ""
+      document.getElementById("pixBox").style.display = "block"
     }
-
-    carregarProdutos()
 
   }catch(e){
     mostrarStatusPedido("Erro ao conectar com a API.", "error")
+  }
+}
+
+async function copiarPix(){
+  const texto = document.getElementById("pixCode").value
+
+  if(!texto){
+    return
+  }
+
+  try{
+    await navigator.clipboard.writeText(texto)
+    alert("Código Pix copiado.")
+  }catch(e){
+    alert("Não foi possível copiar o código.")
   }
 }
 
