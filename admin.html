@@ -38,7 +38,7 @@
     }
 
     .container{
-      max-width:1200px;
+      max-width:1280px;
       margin:0 auto;
     }
 
@@ -85,7 +85,7 @@
       gap:20px;
     }
 
-    @media (max-width: 900px){
+    @media (max-width: 960px){
       .grid{
         grid-template-columns:1fr;
       }
@@ -262,8 +262,33 @@
       margin-bottom:6px;
     }
 
-    .muted{
-      color:var(--muted);
+    .status-pill{
+      display:inline-block;
+      padding:8px 12px;
+      border-radius:999px;
+      font-size:12px;
+      font-weight:700;
+      border:1px solid rgba(255,255,255,.08);
+      background:rgba(255,255,255,.06);
+      color:#fff;
+    }
+
+    .status-pendente{
+      background:rgba(255,184,77,.12);
+      color:#ffe1b3;
+      border-color:rgba(255,184,77,.22);
+    }
+
+    .status-entregue{
+      background:rgba(61,220,151,.1);
+      color:#bdf5dc;
+      border-color:rgba(61,220,151,.22);
+    }
+
+    .status-cancelado{
+      background:rgba(255,95,122,.1);
+      color:#ffd6de;
+      border-color:rgba(255,95,122,.22);
     }
   </style>
 </head>
@@ -272,7 +297,7 @@
     <div class="topbar">
       <div>
         <div class="brand">BLACKOUTS ADMIN</div>
-        <div class="subtitle">Painel de controle de produtos</div>
+        <div class="subtitle">Painel de controle de produtos e pedidos</div>
       </div>
 
       <div class="btn-row">
@@ -325,6 +350,7 @@
           <div style="margin-top:14px;">
             <span class="pill" id="totalProdutosPill">Produtos: 0</span>
             <span class="pill" id="estoqueTotalPill">Estoque total: 0</span>
+            <span class="pill" id="totalPedidosPill">Pedidos: 0</span>
           </div>
         </div>
       </div>
@@ -337,12 +363,29 @@
           </div>
 
           <div class="btn-row">
-            <button id="btnAtualizar" class="btn btn-secondary">Atualizar lista</button>
+            <button id="btnAtualizar" class="btn btn-secondary">Atualizar produtos</button>
           </div>
         </div>
 
         <div id="produtosWrap">
           <div class="empty">Carregando produtos...</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="section-title">
+          <div>
+            <h2 style="margin-bottom:6px;">Pedidos recebidos</h2>
+            <div class="subtitle">Acompanhe as compras realizadas na loja</div>
+          </div>
+
+          <div class="btn-row">
+            <button id="btnAtualizarPedidos" class="btn btn-secondary">Atualizar pedidos</button>
+          </div>
+        </div>
+
+        <div id="pedidosWrap">
+          <div class="empty">Carregando pedidos...</div>
         </div>
       </div>
     </div>
@@ -358,13 +401,16 @@
     const btnSalvarProduto = document.getElementById("btnSalvarProduto")
     const btnCancelarEdicao = document.getElementById("btnCancelarEdicao")
     const btnAtualizar = document.getElementById("btnAtualizar")
+    const btnAtualizarPedidos = document.getElementById("btnAtualizarPedidos")
 
     const loginStatus = document.getElementById("loginStatus")
     const produtoStatus = document.getElementById("produtoStatus")
     const produtosWrap = document.getElementById("produtosWrap")
+    const pedidosWrap = document.getElementById("pedidosWrap")
     const welcomeText = document.getElementById("welcomeText")
     const totalProdutosPill = document.getElementById("totalProdutosPill")
     const estoqueTotalPill = document.getElementById("estoqueTotalPill")
+    const totalPedidosPill = document.getElementById("totalPedidosPill")
     const formTitle = document.getElementById("formTitle")
 
     const emailInput = document.getElementById("email")
@@ -483,6 +529,7 @@
 
         mostrarTelaAdmin()
         carregarProdutos()
+        carregarPedidos()
       } catch (error) {
         mostrarStatus(loginStatus, "Falha ao conectar com a API.", "error")
       }
@@ -519,6 +566,7 @@
 
         mostrarTelaAdmin()
         carregarProdutos()
+        carregarPedidos()
       } catch (error) {
         limparSessao()
         mostrarTelaLogin()
@@ -531,6 +579,10 @@
 
       totalProdutosPill.textContent = "Produtos: " + totalProdutos
       estoqueTotalPill.textContent = "Estoque total: " + estoqueTotal
+    }
+
+    function atualizarResumoPedidos(pedidos) {
+      totalPedidosPill.textContent = "Pedidos: " + pedidos.length
     }
 
     async function carregarProdutos() {
@@ -601,6 +653,84 @@
         produtosWrap.innerHTML = html
       } catch (error) {
         produtosWrap.innerHTML = '<div class="empty">Erro ao conectar com a API.</div>'
+      }
+    }
+
+    async function carregarPedidos() {
+      pedidosWrap.innerHTML = '<div class="empty">Carregando pedidos...</div>'
+
+      try {
+        const resposta = await fetch(API_URL + "/admin/pedidos", {
+          headers: {
+            Authorization: "Bearer " + getToken()
+          }
+        })
+
+        const dados = await lerRespostaSegura(resposta)
+
+        if (!resposta.ok) {
+          pedidosWrap.innerHTML = '<div class="empty">' + (dados.erro || "Erro ao carregar pedidos.") + '</div>'
+          return
+        }
+
+        if (!Array.isArray(dados) || !dados.length) {
+          atualizarResumoPedidos([])
+          pedidosWrap.innerHTML = '<div class="empty">Nenhum pedido encontrado ainda.</div>'
+          return
+        }
+
+        atualizarResumoPedidos(dados)
+
+        let html = `
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Produto</th>
+                <th>Cliente</th>
+                <th>Email</th>
+                <th>Preço</th>
+                <th>Status</th>
+                <th>Data</th>
+              </tr>
+            </thead>
+            <tbody>
+        `
+
+        for (const pedido of dados) {
+          const status = String(pedido.status || "pendente").toLowerCase()
+          const classeStatus =
+            status === "entregue"
+              ? "status-entregue"
+              : status === "cancelado"
+              ? "status-cancelado"
+              : "status-pendente"
+
+          const dataFormatada = pedido.criado_em
+            ? new Date(pedido.criado_em).toLocaleString("pt-BR")
+            : "-"
+
+          html += `
+            <tr>
+              <td>${pedido.id}</td>
+              <td>${pedido.produto_nome ?? "-"}</td>
+              <td>${pedido.nome_cliente ?? "-"}</td>
+              <td>${pedido.email_cliente ?? "-"}</td>
+              <td>R$ ${Number(pedido.preco ?? 0).toFixed(2)}</td>
+              <td><span class="status-pill ${classeStatus}">${pedido.status ?? "pendente"}</span></td>
+              <td>${dataFormatada}</td>
+            </tr>
+          `
+        }
+
+        html += `
+            </tbody>
+          </table>
+        `
+
+        pedidosWrap.innerHTML = html
+      } catch (error) {
+        pedidosWrap.innerHTML = '<div class="empty">Erro ao conectar com a API.</div>'
       }
     }
 
@@ -708,8 +838,10 @@
       limparStatus(loginStatus)
       limparStatus(produtoStatus)
       produtosWrap.innerHTML = ""
+      pedidosWrap.innerHTML = ""
       totalProdutosPill.textContent = "Produtos: 0"
       estoqueTotalPill.textContent = "Estoque total: 0"
+      totalPedidosPill.textContent = "Pedidos: 0"
       senhaInput.value = ""
     }
 
@@ -720,6 +852,7 @@
       limparStatus(produtoStatus)
     })
     btnAtualizar.addEventListener("click", carregarProdutos)
+    btnAtualizarPedidos.addEventListener("click", carregarPedidos)
     btnLogoutTop.addEventListener("click", logout)
 
     verificarSessao()
