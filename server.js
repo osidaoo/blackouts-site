@@ -291,22 +291,57 @@ app.post("/pedidos", async (req, res) => {
   }
 })
 
-app.get("/admin/pedidos", autenticarToken, somenteAdmin, async (req, res) => {
+app.get("/admin/dashboard", autenticarToken, somenteAdmin, async (req, res) => {
   try {
-
-    const { data, error } = await supabase
-      .from("pedidos")
+    const { data: produtos, error: erroProdutos } = await supabase
+      .from("produtos")
       .select("*")
-      .order("criado_em", { ascending: false })
 
-    if (error) {
-      return res.status(500).json({ erro: error.message })
+    if (erroProdutos) {
+      return res.status(500).json({ erro: erroProdutos.message })
     }
 
-    res.json(data)
+    const { data: pedidos, error: erroPedidos } = await supabase
+      .from("pedidos")
+      .select("*")
 
+    if (erroPedidos) {
+      return res.status(500).json({ erro: erroPedidos.message })
+    }
+
+    const hoje = new Date()
+    const inicioHoje = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate())
+
+    const pedidosLista = pedidos || []
+    const produtosLista = produtos || []
+
+    const pedidosHoje = pedidosLista.filter((pedido) => {
+      if (!pedido.criado_em) return false
+      return new Date(pedido.criado_em) >= inicioHoje
+    })
+
+    const faturamentoTotal = pedidosLista.reduce((total, pedido) => {
+      return total + Number(pedido.preco || 0)
+    }, 0)
+
+    const faturamentoHoje = pedidosHoje.reduce((total, pedido) => {
+      return total + Number(pedido.preco || 0)
+    }, 0)
+
+    const estoqueTotal = produtosLista.reduce((total, produto) => {
+      return total + Number(produto.estoque || 0)
+    }, 0)
+
+    res.json({
+      pedidos_totais: pedidosLista.length,
+      faturamento_total: faturamentoTotal,
+      pedidos_hoje: pedidosHoje.length,
+      faturamento_hoje: faturamentoHoje,
+      produtos_totais: produtosLista.length,
+      estoque_total: estoqueTotal
+    })
   } catch (error) {
-    res.status(500).json({ erro: "Erro ao buscar pedidos" })
+    res.status(500).json({ erro: "Erro ao carregar dashboard" })
   }
 })
 
