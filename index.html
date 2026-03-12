@@ -112,7 +112,7 @@ padding:20px;
 }
 .modal{
 width:100%;
-max-width:420px;
+max-width:460px;
 background:var(--panel);
 border:1px solid var(--line);
 border-radius:24px;
@@ -138,6 +138,7 @@ padding:12px 14px;
 border-radius:14px;
 font-size:14px;
 display:none;
+white-space:pre-wrap;
 }
 .status.ok{
 display:block;
@@ -160,6 +161,16 @@ margin-top:10px;
 background:rgba(255,255,255,.08);
 color:#fff;
 border:1px solid rgba(255,255,255,.12);
+}
+.entrega-box{
+margin-top:16px;
+padding:16px;
+border-radius:16px;
+background:rgba(61,220,151,.08);
+border:1px solid rgba(61,220,151,.18);
+}
+.entrega-box strong{
+color:#bdf5dc;
 }
 </style>
 </head>
@@ -201,6 +212,7 @@ Blackouts © 2026
     </div>
 
     <div id="pedidoStatus" class="status"></div>
+    <div id="entregaBox" class="entrega-box" style="display:none;"></div>
   </div>
 </div>
 
@@ -251,6 +263,8 @@ function abrirModal(produtoId){
   document.getElementById("produtoIdPedido").value = produtoId
   document.getElementById("modalBg").style.display = "flex"
   limparStatusPedido()
+  document.getElementById("entregaBox").style.display = "none"
+  document.getElementById("entregaBox").innerHTML = ""
 }
 
 function fecharModal(){
@@ -259,6 +273,8 @@ function fecharModal(){
   document.getElementById("nomeCliente").value = ""
   document.getElementById("emailCliente").value = ""
   limparStatusPedido()
+  document.getElementById("entregaBox").style.display = "none"
+  document.getElementById("entregaBox").innerHTML = ""
 }
 
 function mostrarStatusPedido(texto, tipo){
@@ -277,6 +293,10 @@ async function enviarPedido(){
   const produto_id = Number(document.getElementById("produtoIdPedido").value)
   const nome_cliente = document.getElementById("nomeCliente").value.trim()
   const email_cliente = document.getElementById("emailCliente").value.trim()
+  const entregaBox = document.getElementById("entregaBox")
+
+  entregaBox.style.display = "none"
+  entregaBox.innerHTML = ""
 
   if(!produto_id || !nome_cliente || !email_cliente){
     mostrarStatusPedido("Preencha nome e email.", "error")
@@ -303,11 +323,19 @@ async function enviarPedido(){
       return
     }
 
-    mostrarStatusPedido("Pedido criado com sucesso. ID: " + dados.pedido.id, "ok")
+    mostrarStatusPedido("Pedido criado com sucesso. Entrega liberada abaixo.", "ok")
 
-    setTimeout(() => {
-      fecharModal()
-    }, 1800)
+    if(dados.entrega){
+      entregaBox.innerHTML = `
+        <strong>Conta entregue com sucesso</strong><br><br>
+        Login: <strong>${dados.entrega.login}</strong><br>
+        Senha: <strong>${dados.entrega.senha}</strong><br><br>
+        Guarde esses dados com segurança.
+      `
+      entregaBox.style.display = "block"
+    }
+
+    carregarProdutos()
 
   }catch(e){
     mostrarStatusPedido("Erro ao conectar com a API.", "error")
