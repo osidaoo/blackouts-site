@@ -21,10 +21,7 @@ const MP_ACCESS_TOKEN = process.env.MP_ACCESS_TOKEN
 
 function gerarToken(usuario) {
   return jwt.sign(
-    {
-      id: usuario.id,
-      papel: usuario.papel
-    },
+    { id: usuario.id, papel: usuario.papel },
     process.env.JWT_SECRET,
     { expiresIn: "7d" }
   )
@@ -47,7 +44,7 @@ function autenticarToken(req, res, next) {
     const decoded = jwt.verify(token, process.env.JWT_SECRET)
     req.usuario = decoded
     next()
-  } catch (error) {
+  } catch {
     return res.status(401).json({ erro: "Token expirado ou inválido" })
   }
 }
@@ -62,32 +59,21 @@ function somenteAdmin(req, res, next) {
   next()
 }
 
+function obterIp(req) {
+  return (
+    req.headers["x-forwarded-for"]?.split(",")[0]?.trim() ||
+    req.socket?.remoteAddress ||
+    req.ip ||
+    "desconhecido"
+  )
+}
+
 app.get("/", (req, res) => {
   res.json({ status: "API Blackouts online" })
 })
 
 app.get("/teste-login", (req, res) => {
-  res.json({
-    rota: "/login ativa",
-    metodo: "POST"
-  })
-})
-
-app.get("/debug/admin", async (req, res) => {
-  try {
-    const { data, error } = await supabase
-      .from("usuarios_admin")
-      .select("id, nome, email, papel")
-      .order("id", { ascending: true })
-
-    if (error) {
-      return res.status(500).json({ erro: error.message })
-    }
-
-    res.json(data)
-  } catch (error) {
-    res.status(500).json({ erro: "Erro ao listar admins" })
-  }
+  res.json({ rota: "/login ativa", metodo: "POST" })
 })
 
 app.get("/produtos", async (req, res) => {
@@ -97,12 +83,9 @@ app.get("/produtos", async (req, res) => {
       .select("*")
       .order("id", { ascending: true })
 
-    if (error) {
-      return res.status(500).json({ erro: error.message })
-    }
-
+    if (error) return res.status(500).json({ erro: error.message })
     res.json(data)
-  } catch (error) {
+  } catch {
     res.status(500).json({ erro: "Erro ao buscar produtos" })
   }
 })
@@ -142,34 +125,22 @@ app.post("/login", async (req, res) => {
         papel: data.papel
       }
     })
-  } catch (error) {
+  } catch {
     res.status(500).json({ erro: "Erro interno no login" })
   }
 })
 
 app.get("/me", autenticarToken, (req, res) => {
-  res.json({
-    usuario: req.usuario
-  })
+  res.json({ usuario: req.usuario })
 })
 
 app.get("/admin/dashboard", autenticarToken, somenteAdmin, async (req, res) => {
   try {
-    const { data: produtos, error: erroProdutos } = await supabase
-      .from("produtos")
-      .select("*")
+    const { data: produtos, error: erroProdutos } = await supabase.from("produtos").select("*")
+    if (erroProdutos) return res.status(500).json({ erro: erroProdutos.message })
 
-    if (erroProdutos) {
-      return res.status(500).json({ erro: erroProdutos.message })
-    }
-
-    const { data: pedidos, error: erroPedidos } = await supabase
-      .from("pedidos")
-      .select("*")
-
-    if (erroPedidos) {
-      return res.status(500).json({ erro: erroPedidos.message })
-    }
+    const { data: pedidos, error: erroPedidos } = await supabase.from("pedidos").select("*")
+    if (erroPedidos) return res.status(500).json({ erro: erroPedidos.message })
 
     const hoje = new Date()
     const inicioHoje = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate())
@@ -182,17 +153,9 @@ app.get("/admin/dashboard", autenticarToken, somenteAdmin, async (req, res) => {
       return new Date(pedido.criado_em) >= inicioHoje
     })
 
-    const faturamentoTotal = pedidosLista.reduce((total, pedido) => {
-      return total + Number(pedido.preco || 0)
-    }, 0)
-
-    const faturamentoHoje = pedidosHoje.reduce((total, pedido) => {
-      return total + Number(pedido.preco || 0)
-    }, 0)
-
-    const estoqueTotal = produtosLista.reduce((total, produto) => {
-      return total + Number(produto.estoque || 0)
-    }, 0)
+    const faturamentoTotal = pedidosLista.reduce((total, pedido) => total + Number(pedido.preco || 0), 0)
+    const faturamentoHoje = pedidosHoje.reduce((total, pedido) => total + Number(pedido.preco || 0), 0)
+    const estoqueTotal = produtosLista.reduce((total, produto) => total + Number(produto.estoque || 0), 0)
 
     res.json({
       pedidos_totais: pedidosLista.length,
@@ -202,24 +165,17 @@ app.get("/admin/dashboard", autenticarToken, somenteAdmin, async (req, res) => {
       produtos_totais: produtosLista.length,
       estoque_total: estoqueTotal
     })
-  } catch (error) {
+  } catch {
     res.status(500).json({ erro: "Erro ao carregar dashboard" })
   }
 })
 
 app.get("/admin/produtos", autenticarToken, somenteAdmin, async (req, res) => {
   try {
-    const { data, error } = await supabase
-      .from("produtos")
-      .select("*")
-      .order("id", { ascending: true })
-
-    if (error) {
-      return res.status(500).json({ erro: error.message })
-    }
-
+    const { data, error } = await supabase.from("produtos").select("*").order("id", { ascending: true })
+    if (error) return res.status(500).json({ erro: error.message })
     res.json(data)
-  } catch (error) {
+  } catch {
     res.status(500).json({ erro: "Erro ao buscar produtos do admin" })
   }
 })
@@ -234,21 +190,12 @@ app.post("/admin/produtos", autenticarToken, somenteAdmin, async (req, res) => {
 
     const { data, error } = await supabase
       .from("produtos")
-      .insert([
-        {
-          nome,
-          preco: Number(preco),
-          estoque: Number(estoque)
-        }
-      ])
+      .insert([{ nome, preco: Number(preco), estoque: Number(estoque) }])
       .select()
 
-    if (error) {
-      return res.status(500).json({ erro: error.message })
-    }
-
+    if (error) return res.status(500).json({ erro: error.message })
     res.json(data)
-  } catch (error) {
+  } catch {
     res.status(500).json({ erro: "Erro ao criar produto" })
   }
 })
@@ -264,20 +211,13 @@ app.put("/admin/produtos/:id", autenticarToken, somenteAdmin, async (req, res) =
 
     const { data, error } = await supabase
       .from("produtos")
-      .update({
-        nome,
-        preco: Number(preco),
-        estoque: Number(estoque)
-      })
+      .update({ nome, preco: Number(preco), estoque: Number(estoque) })
       .eq("id", id)
       .select()
 
-    if (error) {
-      return res.status(500).json({ erro: error.message })
-    }
-
+    if (error) return res.status(500).json({ erro: error.message })
     res.json(data)
-  } catch (error) {
+  } catch {
     res.status(500).json({ erro: "Erro ao atualizar produto" })
   }
 })
@@ -285,18 +225,10 @@ app.put("/admin/produtos/:id", autenticarToken, somenteAdmin, async (req, res) =
 app.delete("/admin/produtos/:id", autenticarToken, somenteAdmin, async (req, res) => {
   try {
     const { id } = req.params
-
-    const { error } = await supabase
-      .from("produtos")
-      .delete()
-      .eq("id", id)
-
-    if (error) {
-      return res.status(500).json({ erro: error.message })
-    }
-
+    const { error } = await supabase.from("produtos").delete().eq("id", id)
+    if (error) return res.status(500).json({ erro: error.message })
     res.json({ sucesso: true })
-  } catch (error) {
+  } catch {
     res.status(500).json({ erro: "Erro ao deletar produto" })
   }
 })
@@ -308,66 +240,17 @@ app.get("/admin/pedidos", autenticarToken, somenteAdmin, async (req, res) => {
       .select("*")
       .order("criado_em", { ascending: false })
 
-    if (error) {
-      return res.status(500).json({ erro: error.message })
-    }
-
+    if (error) return res.status(500).json({ erro: error.message })
     res.json(data)
-  } catch (error) {
+  } catch {
     res.status(500).json({ erro: "Erro ao buscar pedidos" })
-  }
-})
-
-app.get("/admin/contas", autenticarToken, somenteAdmin, async (req, res) => {
-  try {
-    const { data, error } = await supabase
-      .from("contas_digitais")
-      .select("*")
-      .order("id", { ascending: false })
-
-    if (error) {
-      return res.status(500).json({ erro: error.message })
-    }
-
-    res.json(data)
-  } catch (error) {
-    res.status(500).json({ erro: "Erro ao buscar contas" })
-  }
-})
-
-app.post("/admin/contas", autenticarToken, somenteAdmin, async (req, res) => {
-  try {
-    const { produto_id, login, senha } = req.body
-
-    if (!produto_id || !login || !senha) {
-      return res.status(400).json({ erro: "Produto, login e senha são obrigatórios" })
-    }
-
-    const { data, error } = await supabase
-      .from("contas_digitais")
-      .insert([
-        {
-          produto_id: Number(produto_id),
-          login,
-          senha,
-          status: "disponivel"
-        }
-      ])
-      .select()
-
-    if (error) {
-      return res.status(500).json({ erro: error.message })
-    }
-
-    res.json(data)
-  } catch (error) {
-    res.status(500).json({ erro: "Erro ao cadastrar conta" })
   }
 })
 
 app.post("/pedidos", async (req, res) => {
   try {
     const { produto_id, nome_cliente, email_cliente } = req.body
+    const ip_cliente = obterIp(req)
 
     if (!produto_id || !nome_cliente || !email_cliente) {
       return res.status(400).json({ erro: "Produto, nome e email são obrigatórios" })
@@ -385,16 +268,15 @@ app.post("/pedidos", async (req, res) => {
 
     const { data: pedidoInserido, error: erroPedido } = await supabase
       .from("pedidos")
-      .insert([
-        {
-          produto_id: produto.id,
-          produto_nome: produto.nome,
-          preco: Number(produto.preco),
-          nome_cliente,
-          email_cliente,
-          status: "aguardando_pagamento"
-        }
-      ])
+      .insert([{
+        produto_id: produto.id,
+        produto_nome: produto.nome,
+        preco: Number(produto.preco),
+        nome_cliente,
+        email_cliente,
+        ip_cliente,
+        status: "aguardando_pagamento"
+      }])
       .select()
 
     if (erroPedido || !pedidoInserido || !pedidoInserido[0]) {
@@ -441,16 +323,15 @@ app.post("/pedidos", async (req, res) => {
 
     const { error: erroPagamento } = await supabase
       .from("pagamentos")
-      .insert([
-        {
-          pedido_id: pedido.id,
-          mp_payment_id: String(mpData.id),
-          status: mpData.status || "pending",
-          qr_code: qrCode,
-          qr_code_base64: qrCodeBase64,
-          valor: Number(produto.preco)
-        }
-      ])
+      .insert([{
+        pedido_id: pedido.id,
+        mp_payment_id: String(mpData.id),
+        status: mpData.status || "pending",
+        qr_code: qrCode,
+        qr_code_base64: qrCodeBase64,
+        valor: Number(produto.preco),
+        detalhe_status: mpData.status_detail || null
+      }])
 
     if (erroPagamento) {
       return res.status(500).json({ erro: erroPagamento.message })
@@ -467,7 +348,7 @@ app.post("/pedidos", async (req, res) => {
       },
       entrega_url: `https://blackouts-site.vercel.app/entrega.html?pedido=${pedido.id}&email=${encodeURIComponent(email_cliente)}`
     })
-  } catch (error) {
+  } catch {
     res.status(500).json({ erro: "Erro ao criar pedido com PIX" })
   }
 })
@@ -501,9 +382,7 @@ app.get("/pedido-status", async (req, res) => {
         .eq("id", pedido.conta_entregue_id)
         .single()
 
-      if (conta) {
-        entrega = conta
-      }
+      if (conta) entrega = conta
     }
 
     res.json({
@@ -512,11 +391,13 @@ app.get("/pedido-status", async (req, res) => {
         status: pedido.status,
         produto_nome: pedido.produto_nome,
         preco: pedido.preco,
-        criado_em: pedido.criado_em
+        criado_em: pedido.criado_em,
+        payment_id_externo: pedido.payment_id_externo || null,
+        entregue_em: pedido.entregue_em || null
       },
       entrega
     })
-  } catch (error) {
+  } catch {
     res.status(500).json({ erro: "Erro ao consultar pedido" })
   }
 })
@@ -529,26 +410,29 @@ app.post("/webhook/mercadopago", async (req, res) => {
       return res.status(200).send("ok")
     }
 
-    const mpResponse = await fetch(
-      `https://api.mercadopago.com/v1/payments/${paymentId}`,
-      {
-        headers: {
-          Authorization: `Bearer ${process.env.MP_ACCESS_TOKEN}`
-        }
+    const mpResponse = await fetch(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
+      headers: {
+        Authorization: `Bearer ${process.env.MP_ACCESS_TOKEN}`
       }
-    )
+    })
 
     const pagamento = await mpResponse.json()
 
     if (pagamento.status !== "approved") {
+      await supabase
+        .from("pagamentos")
+        .update({
+          webhook_recebido: true,
+          status: pagamento.status || "unknown",
+          detalhe_status: pagamento.status_detail || null
+        })
+        .eq("mp_payment_id", String(paymentId))
+
       return res.status(200).send("ok")
     }
 
     const pedidoId = Number(pagamento.external_reference)
-
-    if (!pedidoId) {
-      return res.status(200).send("ok")
-    }
+    if (!pedidoId) return res.status(200).send("ok")
 
     const { data: pedido } = await supabase
       .from("pedidos")
@@ -556,13 +440,8 @@ app.post("/webhook/mercadopago", async (req, res) => {
       .eq("id", pedidoId)
       .single()
 
-    if (!pedido) {
-      return res.status(200).send("ok")
-    }
-
-    if (pedido.status === "pago") {
-      return res.status(200).send("ok")
-    }
+    if (!pedido) return res.status(200).send("ok")
+    if (pedido.status === "pago") return res.status(200).send("ok")
 
     const { data: conta } = await supabase
       .from("contas_digitais")
@@ -590,19 +469,23 @@ app.post("/webhook/mercadopago", async (req, res) => {
       .from("pedidos")
       .update({
         status: "pago",
-        conta_entregue_id: conta.id
+        conta_entregue_id: conta.id,
+        payment_id_externo: String(paymentId),
+        entregue_em: new Date().toISOString()
       })
       .eq("id", pedido.id)
 
     await supabase
       .from("pagamentos")
       .update({
-        status: "approved"
+        status: "approved",
+        webhook_recebido: true,
+        pago_em: new Date().toISOString(),
+        detalhe_status: pagamento.status_detail || null
       })
       .eq("mp_payment_id", String(paymentId))
 
     console.log("CONTA ENTREGUE:", conta.login)
-
     return res.status(200).send("ok")
   } catch (error) {
     console.log("Erro webhook:", error)
