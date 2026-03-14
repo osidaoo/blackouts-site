@@ -276,11 +276,15 @@ async function carregarProdutos(){
     let html = ""
 
     produtos.forEach(produto => {
+      const nome = produto.name ?? produto.nome ?? "-"
+      const preco = Number(produto.price ?? produto.preco ?? 0)
+      const estoque = produto.stock_available ?? produto.estoque ?? "-"
+
       html += `
         <div class="card">
-          <h3>${produto.nome}</h3>
-          <div class="price">R$ ${Number(produto.preco).toFixed(2)}</div>
-          <div class="stock">Estoque: ${produto.estoque}</div>
+          <h3>${nome}</h3>
+          <div class="price">R$ ${preco.toFixed(2)}</div>
+          <div class="stock">Estoque: ${estoque}</div>
           <button class="btn" onclick="abrirModal(${produto.id})">Comprar</button>
         </div>
       `

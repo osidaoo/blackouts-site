@@ -127,6 +127,22 @@
       font-size:15px;
     }
 
+    select{
+      width:100%;
+      padding:14px 16px;
+      border-radius:14px;
+      border:1px solid rgba(255,255,255,.12);
+      background:rgba(255,255,255,.04);
+      color:#fff;
+      outline:none;
+      margin-bottom:14px;
+      font-size:15px;
+    }
+
+    select option{
+      color:#00152f;
+    }
+
     input:focus{
       border-color:var(--primary);
       box-shadow:0 0 0 3px rgba(78,161,255,.15);
@@ -386,7 +402,7 @@
         </div>
 
         <div class="stat-card">
-          <div class="stat-label">Estoque total</div>
+          <div class="stat-label">Estoque disponivel</div>
           <div class="stat-value" id="statEstoqueTotal">0</div>
         </div>
       </div>
@@ -403,8 +419,8 @@
           <label for="precoProduto">Preço</label>
           <input id="precoProduto" type="number" step="0.01" placeholder="Ex: 29.90" />
 
-          <label for="estoqueProduto">Estoque</label>
-          <input id="estoqueProduto" type="number" placeholder="Ex: 10" />
+          <label for="produtoEstoque">Estoque disponivel</label>
+          <input id="produtoEstoque" type="number" placeholder="Calculado automaticamente" disabled />
 
           <div class="btn-row">
             <button id="btnSalvarProduto" class="btn btn-primary">Salvar produto</button>
@@ -420,7 +436,7 @@
 
           <div style="margin-top:14px;">
             <span class="pill" id="totalProdutosPill">Produtos: 0</span>
-            <span class="pill" id="estoqueTotalPill">Estoque total: 0</span>
+            <span class="pill" id="estoqueTotalPill">Estoque disponivel: 0</span>
             <span class="pill" id="totalPedidosPill">Pedidos: 0</span>
           </div>
         </div>
@@ -441,6 +457,58 @@
 
         <div id="produtosWrap">
           <div class="empty">Carregando produtos...</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="section-title">
+          <div>
+            <h2 style="margin-bottom:6px;">Estoque</h2>
+            <div class="subtitle">Cadastre contas e controle a entrega</div>
+          </div>
+
+          <div class="btn-row">
+            <button id="btnAtualizarEstoque" class="btn btn-secondary">Atualizar estoque</button>
+          </div>
+        </div>
+
+        <div class="grid">
+          <div>
+            <h3 id="estoqueFormTitle" style="margin-bottom:14px;">Adicionar item de estoque</h3>
+
+            <input id="estoqueId" type="hidden" />
+
+            <label for="estoqueProdutoSelect">Produto</label>
+            <select id="estoqueProdutoSelect"></select>
+
+            <label for="estoqueLogin">Login</label>
+            <input id="estoqueLogin" type="text" placeholder="Login da conta" />
+
+            <label for="estoqueSenha">Senha</label>
+            <input id="estoqueSenha" type="text" placeholder="Senha da conta" />
+
+            <label for="estoqueExtra">Extra</label>
+            <input id="estoqueExtra" type="text" placeholder="Informacoes adicionais" />
+
+            <label for="estoqueStatusSelect">Status</label>
+            <select id="estoqueStatusSelect">
+              <option value="available">Disponivel</option>
+              <option value="sold">Vendido</option>
+            </select>
+
+            <div class="btn-row">
+              <button id="btnSalvarEstoque" class="btn btn-primary">Salvar item</button>
+              <button id="btnCancelarEstoque" class="btn btn-secondary">Cancelar</button>
+            </div>
+
+            <div id="estoqueStatusMsg" class="status"></div>
+          </div>
+
+          <div>
+            <div id="estoqueWrap">
+              <div class="empty">Carregando estoque...</div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -475,16 +543,21 @@
     const btnAtualizar = document.getElementById("btnAtualizar")
     const btnAtualizarPedidos = document.getElementById("btnAtualizarPedidos")
     const btnAtualizarDashboard = document.getElementById("btnAtualizarDashboard")
+    const btnAtualizarEstoque = document.getElementById("btnAtualizarEstoque")
+    const btnSalvarEstoque = document.getElementById("btnSalvarEstoque")
+    const btnCancelarEstoque = document.getElementById("btnCancelarEstoque")
 
     const loginStatus = document.getElementById("loginStatus")
     const produtoStatus = document.getElementById("produtoStatus")
     const produtosWrap = document.getElementById("produtosWrap")
     const pedidosWrap = document.getElementById("pedidosWrap")
+    const estoqueWrap = document.getElementById("estoqueWrap")
     const welcomeText = document.getElementById("welcomeText")
     const totalProdutosPill = document.getElementById("totalProdutosPill")
     const estoqueTotalPill = document.getElementById("estoqueTotalPill")
     const totalPedidosPill = document.getElementById("totalPedidosPill")
     const formTitle = document.getElementById("formTitle")
+    const estoqueFormTitle = document.getElementById("estoqueFormTitle")
 
     const statPedidosTotais = document.getElementById("statPedidosTotais")
     const statFaturamentoTotal = document.getElementById("statFaturamentoTotal")
@@ -499,7 +572,17 @@
     const produtoIdInput = document.getElementById("produtoId")
     const nomeProdutoInput = document.getElementById("nomeProduto")
     const precoProdutoInput = document.getElementById("precoProduto")
-    const estoqueProdutoInput = document.getElementById("estoqueProduto")
+    const produtoEstoqueInput = document.getElementById("produtoEstoque")
+
+    const estoqueIdInput = document.getElementById("estoqueId")
+    const estoqueProdutoSelect = document.getElementById("estoqueProdutoSelect")
+    const estoqueLoginInput = document.getElementById("estoqueLogin")
+    const estoqueSenhaInput = document.getElementById("estoqueSenha")
+    const estoqueExtraInput = document.getElementById("estoqueExtra")
+    const estoqueStatusSelect = document.getElementById("estoqueStatusSelect")
+    const estoqueStatusMsg = document.getElementById("estoqueStatusMsg")
+
+    let produtosCache = []
 
     function mostrarStatus(el, texto, tipo) {
       el.className = "status " + tipo
@@ -565,8 +648,39 @@
       produtoIdInput.value = ""
       nomeProdutoInput.value = ""
       precoProdutoInput.value = ""
-      estoqueProdutoInput.value = ""
+      produtoEstoqueInput.value = ""
       formTitle.textContent = "Cadastrar produto"
+    }
+
+    function limparFormularioEstoque() {
+      estoqueIdInput.value = ""
+      estoqueLoginInput.value = ""
+      estoqueSenhaInput.value = ""
+      estoqueExtraInput.value = ""
+      estoqueStatusSelect.value = "available"
+      estoqueFormTitle.textContent = "Adicionar item de estoque"
+    }
+
+    function popularSelectProdutos(produtos) {
+      produtosCache = Array.isArray(produtos) ? produtos : []
+
+      if (!estoqueProdutoSelect) {
+        return
+      }
+
+      if (!produtosCache.length) {
+        estoqueProdutoSelect.innerHTML = '<option value="">Nenhum produto</option>'
+        return
+      }
+
+      let options = '<option value="">Selecione um produto</option>'
+
+      for (const produto of produtosCache) {
+        const nome = produto.name ?? produto.nome ?? "Produto"
+        options += `<option value="${produto.id}">${nome}</option>`
+      }
+
+      estoqueProdutoSelect.innerHTML = options
     }
 
     async function lerRespostaSegura(resposta) {
@@ -618,6 +732,7 @@
         carregarDashboard()
         carregarProdutos()
         carregarPedidos()
+        carregarEstoque()
       } catch (error) {
         mostrarStatus(loginStatus, "Falha ao conectar com a API.", "error")
       }
@@ -656,6 +771,7 @@
         carregarDashboard()
         carregarProdutos()
         carregarPedidos()
+        carregarEstoque()
       } catch (error) {
         limparSessao()
         mostrarTelaLogin()
@@ -681,16 +797,19 @@
         statPedidosHoje.textContent = dados.pedidos_hoje ?? 0
         statFaturamentoHoje.textContent = formatarMoeda(dados.faturamento_hoje ?? 0)
         statProdutosTotais.textContent = dados.produtos_totais ?? 0
-        statEstoqueTotal.textContent = dados.estoque_total ?? 0
+        statEstoqueTotal.textContent = dados.estoque_disponivel ?? dados.estoque_total ?? 0
       } catch (error) {}
     }
 
     function atualizarResumoProdutos(produtos) {
       const totalProdutos = produtos.length
-      const estoqueTotal = produtos.reduce((total, item) => total + Number(item.estoque || 0), 0)
+      const estoqueTotal = produtos.reduce(
+        (total, item) => total + Number(item.stock_available ?? item.estoque ?? 0),
+        0
+      )
 
       totalProdutosPill.textContent = "Produtos: " + totalProdutos
-      estoqueTotalPill.textContent = "Estoque total: " + estoqueTotal
+      estoqueTotalPill.textContent = "Estoque disponivel: " + estoqueTotal
     }
 
     function atualizarResumoPedidos(pedidos) {
@@ -716,11 +835,13 @@
 
         if (!Array.isArray(dados) || !dados.length) {
           atualizarResumoProdutos([])
+          popularSelectProdutos([])
           produtosWrap.innerHTML = '<div class="empty">Nenhum produto cadastrado ainda.</div>'
           return
         }
 
         atualizarResumoProdutos(dados)
+        popularSelectProdutos(dados)
 
         let html = `
           <table>
@@ -738,14 +859,16 @@
 
         for (const produto of dados) {
           const produtoJson = encodeURIComponent(JSON.stringify(produto))
-          const estoqueNumero = Number(produto.estoque || 0)
+          const estoqueNumero = Number(produto.stock_available ?? produto.estoque ?? 0)
+          const nomeProduto = produto.name ?? produto.nome ?? ""
+          const precoProduto = produto.price ?? produto.preco ?? 0
           const classeEstoque = estoqueNumero <= 3 ? "stock-low" : "stock-ok"
 
           html += `
             <tr>
               <td>${produto.id}</td>
-              <td>${produto.nome ?? ""}</td>
-              <td>${formatarMoeda(produto.preco ?? 0)}</td>
+              <td>${nomeProduto}</td>
+              <td>${formatarMoeda(precoProduto)}</td>
               <td class="${classeEstoque}">${estoqueNumero}</td>
               <td>
                 <div class="produto-actions">
@@ -765,6 +888,186 @@
         produtosWrap.innerHTML = html
       } catch (error) {
         produtosWrap.innerHTML = '<div class="empty">Erro ao conectar com a API.</div>'
+      }
+    }
+
+    async function carregarEstoque() {
+      estoqueWrap.innerHTML = '<div class="empty">Carregando estoque...</div>'
+
+      try {
+        const resposta = await fetch(API_URL + "/admin/estoque", {
+          headers: {
+            Authorization: "Bearer " + getToken()
+          }
+        })
+
+        const dados = await lerRespostaSegura(resposta)
+
+        if (!resposta.ok) {
+          estoqueWrap.innerHTML = '<div class="empty">' + (dados.erro || "Erro ao carregar estoque.") + '</div>'
+          return
+        }
+
+        if (!Array.isArray(dados) || !dados.length) {
+          estoqueWrap.innerHTML = '<div class="empty">Nenhum item de estoque cadastrado.</div>'
+          return
+        }
+
+        let html = `
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Produto</th>
+                <th>Login</th>
+                <th>Senha</th>
+                <th>Extra</th>
+                <th>Status</th>
+                <th>Acoes</th>
+              </tr>
+            </thead>
+            <tbody>
+        `
+
+        for (const item of dados) {
+          const itemJson = encodeURIComponent(JSON.stringify(item))
+          const status = String(item.status || "available").toLowerCase()
+          const statusClasse = status === "sold" ? "status-cancelado" : "status-entregue"
+          const statusLabel = status === "sold" ? "vendido" : "disponivel"
+
+          html += `
+            <tr>
+              <td>${item.id}</td>
+              <td>${item.product_name ?? "-"}</td>
+              <td>${item.content_login ?? "-"}</td>
+              <td>${item.content_password ?? "-"}</td>
+              <td>${item.content_extra ?? "-"}</td>
+              <td><span class="status-pill ${statusClasse}">${statusLabel}</span></td>
+              <td>
+                <div class="produto-actions">
+                  <button class="btn btn-secondary small" onclick="editarEstoque('${itemJson}')">Editar</button>
+                  <button class="btn btn-danger small" onclick="deletarEstoque(${item.id})">Excluir</button>
+                </div>
+              </td>
+            </tr>
+          `
+        }
+
+        html += `
+            </tbody>
+          </table>
+        `
+
+        estoqueWrap.innerHTML = html
+      } catch (error) {
+        estoqueWrap.innerHTML = '<div class="empty">Erro ao conectar com a API.</div>'
+      }
+    }
+
+    async function salvarEstoque() {
+      limparStatus(estoqueStatusMsg)
+
+      const id = estoqueIdInput.value.trim()
+      const produtoId = Number(estoqueProdutoSelect.value)
+      const login = estoqueLoginInput.value.trim()
+      const senha = estoqueSenhaInput.value.trim()
+      const extra = estoqueExtraInput.value.trim()
+      const status = estoqueStatusSelect.value
+
+      if (!produtoId || !login || !senha) {
+        mostrarStatus(estoqueStatusMsg, "Preencha produto, login e senha.", "error")
+        return
+      }
+
+      const payload = {
+        product_id: produtoId,
+        content_login: login,
+        content_password: senha,
+        content_extra: extra || null,
+        status
+      }
+
+      const url = id
+        ? API_URL + "/admin/estoque/" + id
+        : API_URL + "/admin/estoque"
+
+      const method = id ? "PUT" : "POST"
+
+      try {
+        const resposta = await fetch(url, {
+          method,
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: "Bearer " + getToken()
+          },
+          body: JSON.stringify(payload)
+        })
+
+        const dados = await lerRespostaSegura(resposta)
+
+        if (!resposta.ok) {
+          mostrarStatus(estoqueStatusMsg, dados.erro || "Erro ao salvar item de estoque.", "error")
+          return
+        }
+
+        mostrarStatus(
+          estoqueStatusMsg,
+          id ? "Item de estoque atualizado." : "Item de estoque criado.",
+          "ok"
+        )
+
+        limparFormularioEstoque()
+        carregarEstoque()
+        carregarDashboard()
+        carregarProdutos()
+      } catch (error) {
+        mostrarStatus(estoqueStatusMsg, "Erro ao conectar com a API.", "error")
+      }
+    }
+
+    function editarEstoque(itemCodificado) {
+      const item = JSON.parse(decodeURIComponent(itemCodificado))
+
+      estoqueIdInput.value = item.id
+      estoqueProdutoSelect.value = item.product_id ?? ""
+      estoqueLoginInput.value = item.content_login ?? ""
+      estoqueSenhaInput.value = item.content_password ?? ""
+      estoqueExtraInput.value = item.content_extra ?? ""
+      estoqueStatusSelect.value = String(item.status || "available").toLowerCase()
+
+      estoqueFormTitle.textContent = "Editar item de estoque"
+      mostrarStatus(estoqueStatusMsg, "Modo edicao ativado para o item ID " + item.id, "warn")
+      window.scrollTo({ top: 0, behavior: "smooth" })
+    }
+
+    async function deletarEstoque(id) {
+      const confirmar = confirm("Tem certeza que deseja excluir este item de estoque?")
+
+      if (!confirmar) {
+        return
+      }
+
+      try {
+        const resposta = await fetch(API_URL + "/admin/estoque/" + id, {
+          method: "DELETE",
+          headers: {
+            Authorization: "Bearer " + getToken()
+          }
+        })
+
+        const dados = await lerRespostaSegura(resposta)
+
+        if (!resposta.ok) {
+          alert(dados.erro || "Erro ao excluir item de estoque.")
+          return
+        }
+
+        alert("Item de estoque excluido com sucesso.")
+        carregarEstoque()
+        carregarDashboard()
+        carregarProdutos()
+      } catch (error) {
+        alert("Erro ao conectar com a API.")
       }
     }
 
@@ -810,26 +1113,40 @@
         `
 
         for (const pedido of dados) {
-          const status = String(pedido.status || "pendente").toLowerCase()
-          const classeStatus =
-            status === "entregue"
-              ? "status-entregue"
-              : status === "cancelado"
-              ? "status-cancelado"
-              : "status-pendente"
+          const item = Array.isArray(pedido.order_items) ? pedido.order_items[0] : null
+          const produtoNome = item?.products?.name || "-"
+          const precoPedido = item?.price ?? pedido.total ?? 0
+          const clienteNome =
+            pedido.nome_cliente || pedido.customer_name || pedido.cliente_nome || "-"
+          const clienteEmail =
+            pedido.email_cliente || pedido.customer_email || pedido.cliente_email || "-"
 
-          const dataFormatada = pedido.criado_em
-            ? new Date(pedido.criado_em).toLocaleString("pt-BR")
+          const statusRaw = String(pedido.payment_status || pedido.status || "pending").toLowerCase()
+          let classeStatus = "status-pendente"
+          let statusLabel = "pendente"
+
+          if (["paid", "approved"].includes(statusRaw)) {
+            classeStatus = "status-entregue"
+            statusLabel = "pago"
+          } else if (
+            ["cancelled", "canceled", "rejected", "refunded", "chargeback"].includes(statusRaw)
+          ) {
+            classeStatus = "status-cancelado"
+            statusLabel = "cancelado"
+          }
+
+          const dataFormatada = pedido.created_at
+            ? new Date(pedido.created_at).toLocaleString("pt-BR")
             : "-"
 
           html += `
             <tr>
               <td>${pedido.id}</td>
-              <td>${pedido.produto_nome ?? "-"}</td>
-              <td>${pedido.nome_cliente ?? "-"}</td>
-              <td>${pedido.email_cliente ?? "-"}</td>
-              <td>${formatarMoeda(pedido.preco ?? 0)}</td>
-              <td><span class="status-pill ${classeStatus}">${pedido.status ?? "pendente"}</span></td>
+              <td>${produtoNome}</td>
+              <td>${clienteNome}</td>
+              <td>${clienteEmail}</td>
+              <td>${formatarMoeda(precoPedido)}</td>
+              <td><span class="status-pill ${classeStatus}">${statusLabel}</span></td>
               <td>${dataFormatada}</td>
             </tr>
           `
@@ -850,9 +1167,9 @@
       const produto = JSON.parse(decodeURIComponent(produtoCodificado))
 
       produtoIdInput.value = produto.id
-      nomeProdutoInput.value = produto.nome ?? ""
-      precoProdutoInput.value = produto.preco ?? ""
-      estoqueProdutoInput.value = produto.estoque ?? ""
+      nomeProdutoInput.value = produto.name ?? produto.nome ?? ""
+      precoProdutoInput.value = produto.price ?? produto.preco ?? ""
+      produtoEstoqueInput.value = produto.stock_available ?? produto.estoque ?? ""
       formTitle.textContent = "Editar produto"
 
       mostrarStatus(produtoStatus, "Modo edição ativado para o produto ID " + produto.id, "warn")
@@ -865,17 +1182,14 @@
       const id = produtoIdInput.value.trim()
       const nome = nomeProdutoInput.value.trim()
       const preco = precoProdutoInput.value.trim()
-      const estoque = estoqueProdutoInput.value.trim()
-
-      if (!nome || preco === "" || estoque === "") {
-        mostrarStatus(produtoStatus, "Preencha nome, preço e estoque.", "error")
+      if (!nome || preco === "") {
+        mostrarStatus(produtoStatus, "Preencha nome e preço.", "error")
         return
       }
 
       const payload = {
-        nome,
-        preco: Number(preco),
-        estoque: Number(estoque)
+        name: nome,
+        price: Number(preco)
       }
 
       const url = id
@@ -949,12 +1263,15 @@
       limparSessao()
       mostrarTelaLogin()
       limparFormularioProduto()
+      limparFormularioEstoque()
       limparStatus(loginStatus)
       limparStatus(produtoStatus)
+      limparStatus(estoqueStatusMsg)
       produtosWrap.innerHTML = ""
+      estoqueWrap.innerHTML = ""
       pedidosWrap.innerHTML = ""
       totalProdutosPill.textContent = "Produtos: 0"
-      estoqueTotalPill.textContent = "Estoque total: 0"
+      estoqueTotalPill.textContent = "Estoque disponivel: 0"
       totalPedidosPill.textContent = "Pedidos: 0"
       statPedidosTotais.textContent = "0"
       statFaturamentoTotal.textContent = "R$ 0,00"
@@ -971,9 +1288,15 @@
       limparFormularioProduto()
       limparStatus(produtoStatus)
     })
+    btnSalvarEstoque.addEventListener("click", salvarEstoque)
+    btnCancelarEstoque.addEventListener("click", () => {
+      limparFormularioEstoque()
+      limparStatus(estoqueStatusMsg)
+    })
     btnAtualizar.addEventListener("click", carregarProdutos)
     btnAtualizarPedidos.addEventListener("click", carregarPedidos)
     btnAtualizarDashboard.addEventListener("click", carregarDashboard)
+    btnAtualizarEstoque.addEventListener("click", carregarEstoque)
     btnLogoutTop.addEventListener("click", logout)
 
     verificarSessao()

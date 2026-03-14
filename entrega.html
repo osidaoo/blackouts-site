@@ -199,9 +199,17 @@
           return
         }
 
-        const statusPedido = String(dados?.pedido?.status || "")
+        const statusPagamento = String(
+          dados?.pedido?.payment_status || dados?.pedido?.status || ""
+        ).toLowerCase()
 
-        if (statusPedido === "aguardando_pagamento") {
+        if (["paid", "approved"].includes(statusPagamento)) {
+          statusArea.className = "status warn"
+          statusArea.textContent = "Pagamento confirmado. Estamos preparando a entrega."
+          return
+        }
+
+        if (["pending", "in_process"].includes(statusPagamento)) {
           statusArea.className = "status warn"
           statusArea.textContent = "Seu pagamento ainda não foi confirmado. Assim que o Pix for aprovado, a conta aparecerá aqui."
           return

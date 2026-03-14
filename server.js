@@ -77,6 +77,57 @@ function normalizarStatusEstoque(status) {
   return valor
 }
 
+function normalizarEmail(email) {
+  return String(email || "").trim().toLowerCase()
+}
+
+async function carregarProdutosComEstoque({ orderBy } = {}) {
+  let query = supabase.from("products").select("*")
+
+  if (orderBy) {
+    query = query.order(orderBy, { ascending: true })
+  }
+
+  const { data: produtos, error } = await query
+
+  if (error) {
+    return { error }
+  }
+
+  const { data: estoque, error: erroEstoque } = await supabase
+    .from("inventory_items")
+    .select("product_id, status")
+
+  if (erroEstoque) {
+    return { error: erroEstoque }
+  }
+
+  const estoquePorProduto = {}
+
+  for (const item of estoque || []) {
+    const statusNormalizado = normalizarStatusEstoque(item.status)
+
+    if (statusNormalizado !== "available") {
+      continue
+    }
+
+    const productId = item.product_id
+
+    if (productId === null || productId === undefined) {
+      continue
+    }
+
+    estoquePorProduto[productId] = (estoquePorProduto[productId] || 0) + 1
+  }
+
+  const produtosComEstoque = (produtos || []).map((produto) => ({
+    ...produto,
+    stock_available: estoquePorProduto[produto.id] || 0
+  }))
+
+  return { data: produtosComEstoque }
+}
+
 app.get("/", (req, res) => {
   res.json({ status: "API Blackouts online" })
 })
@@ -87,10 +138,7 @@ app.get("/teste-login", (req, res) => {
 
 app.get("/produtos", async (req, res) => {
   try {
-    const { data, error } = await supabase
-      .from("products")
-      .select("*")
-      .order("name", { ascending: true })
+    const { data, error } = await carregarProdutosComEstoque({ orderBy: "name" })
 
     if (error) return res.status(500).json({ erro: error.message })
 
@@ -187,7 +235,8 @@ app.get("/admin/dashboard", autenticarToken, somenteAdmin, async (req, res) => {
       pedidos_hoje: pedidosHoje.length,
       faturamento_hoje: faturamentoHoje,
       produtos_totais: produtosLista.length,
-      estoque_disponivel: estoqueDisponivel
+      estoque_disponivel: estoqueDisponivel,
+      estoque_total: estoqueDisponivel
     })
   } catch (error) {
     res.status(500).json({ erro: "Erro ao carregar dashboard" })
@@ -196,10 +245,7 @@ app.get("/admin/dashboard", autenticarToken, somenteAdmin, async (req, res) => {
 
 app.get("/admin/produtos", autenticarToken, somenteAdmin, async (req, res) => {
   try {
-    const { data, error } = await supabase
-      .from("products")
-      .select("*")
-      .order("created_at", { ascending: true })
+    const { data, error } = await carregarProdutosComEstoque({ orderBy: "created_at" })
 
     if (error) return res.status(500).json({ erro: error.message })
 
@@ -290,7 +336,7 @@ app.get("/admin/pedidos", autenticarToken, somenteAdmin, async (req, res) => {
       .from("orders")
       .select(`
         *,
-        order_items (*),
+        order_items (*, products (name)),
         payments (*)
       `)
       .order("created_at", { ascending: false })
@@ -300,6 +346,130 @@ app.get("/admin/pedidos", autenticarToken, somenteAdmin, async (req, res) => {
     res.json(data || [])
   } catch (error) {
     res.status(500).json({ erro: "Erro ao buscar pedidos" })
+  }
+})
+
+app.get("/admin/estoque", autenticarToken, somenteAdmin, async (req, res) => {
+  try {
+    const { data: estoque, error: erroEstoque } = await supabase
+      .from("inventory_items")
+      .select("*")
+      .order("created_at", { ascending: false })
+
+    if (erroEstoque) return res.status(500).json({ erro: erroEstoque.message })
+
+    const { data: produtos, error: erroProdutos } = await supabase
+      .from("products")
+      .select("id, name")
+
+    if (erroProdutos) return res.status(500).json({ erro: erroProdutos.message })
+
+    const produtosMap = new Map(
+      (produtos || []).map((produto) => [produto.id, produto.name])
+    )
+
+    const resposta = (estoque || []).map((item) => ({
+      ...item,
+      status: normalizarStatusEstoque(item.status),
+      product_name: produtosMap.get(item.product_id) || null
+    }))
+
+    res.json(resposta)
+  } catch (error) {
+    res.status(500).json({ erro: "Erro ao carregar estoque" })
+  }
+})
+
+app.post("/admin/estoque", autenticarToken, somenteAdmin, async (req, res) => {
+  try {
+    const {
+      product_id,
+      content_login,
+      content_password,
+      content_extra,
+      status
+    } = req.body
+
+    if (!product_id || !content_login || !content_password) {
+      return res.status(400).json({ erro: "Produto, login e senha são obrigatórios" })
+    }
+
+    const statusNormalizado = normalizarStatusEstoque(status || "available") || "available"
+
+    const { data, error } = await supabase
+      .from("inventory_items")
+      .insert([{
+        product_id,
+        content_login,
+        content_password,
+        content_extra: content_extra || null,
+        status: statusNormalizado
+      }])
+      .select()
+      .single()
+
+    if (error) return res.status(500).json({ erro: error.message })
+
+    res.json(data)
+  } catch (error) {
+    res.status(500).json({ erro: "Erro ao criar item de estoque" })
+  }
+})
+
+app.put("/admin/estoque/:id", autenticarToken, somenteAdmin, async (req, res) => {
+  try {
+    const { id } = req.params
+    const {
+      product_id,
+      content_login,
+      content_password,
+      content_extra,
+      status
+    } = req.body
+
+    const atualizacao = {}
+
+    if (product_id !== undefined) atualizacao.product_id = product_id
+    if (content_login !== undefined) atualizacao.content_login = content_login
+    if (content_password !== undefined) atualizacao.content_password = content_password
+    if (content_extra !== undefined) atualizacao.content_extra = content_extra || null
+    if (status !== undefined) {
+      atualizacao.status = normalizarStatusEstoque(status || "available") || "available"
+    }
+
+    if (!Object.keys(atualizacao).length) {
+      return res.status(400).json({ erro: "Nenhum campo para atualizar" })
+    }
+
+    const { data, error } = await supabase
+      .from("inventory_items")
+      .update(atualizacao)
+      .eq("id", id)
+      .select()
+      .single()
+
+    if (error) return res.status(500).json({ erro: error.message })
+
+    res.json(data)
+  } catch (error) {
+    res.status(500).json({ erro: "Erro ao atualizar estoque" })
+  }
+})
+
+app.delete("/admin/estoque/:id", autenticarToken, somenteAdmin, async (req, res) => {
+  try {
+    const { id } = req.params
+
+    const { error } = await supabase
+      .from("inventory_items")
+      .delete()
+      .eq("id", id)
+
+    if (error) return res.status(500).json({ erro: error.message })
+
+    res.json({ sucesso: true })
+  } catch (error) {
+    res.status(500).json({ erro: "Erro ao deletar item de estoque" })
   }
 })
 
@@ -326,16 +496,38 @@ app.post("/pedidos", async (req, res) => {
       return res.status(404).json({ erro: "Produto não encontrado" })
     }
 
-    const { data: orderInserida, error: erroOrder } = await supabase
+    const payloadOrder = {
+      user_id: null,
+      status: "pending",
+      total: Number(produto.price),
+      payment_status: "pending",
+      customer_name: nome_cliente,
+      customer_email: email_cliente
+    }
+
+    let { data: orderInserida, error: erroOrder } = await supabase
       .from("orders")
-      .insert([{
+      .insert([payloadOrder])
+      .select()
+      .single()
+
+    if (erroOrder) {
+      const payloadFallback = {
         user_id: null,
         status: "pending",
         total: Number(produto.price),
         payment_status: "pending"
-      }])
-      .select()
-      .single()
+      }
+
+      const tentativaFallback = await supabase
+        .from("orders")
+        .insert([payloadFallback])
+        .select()
+        .single()
+
+      orderInserida = tentativaFallback.data
+      erroOrder = tentativaFallback.error
+    }
 
     if (erroOrder || !orderInserida) {
       return res.status(500).json({ erro: erroOrder?.message || "Erro ao criar order" })
@@ -371,7 +563,7 @@ app.post("/pedidos", async (req, res) => {
         transaction_amount: Number(produto.price),
         description: produto.name,
         payment_method_id: "pix",
-        notification_url: "https://blackouts-site.onrender.com/webhook/mercadopago",
+        notification_url: "https://api.blackouts.site/webhook/mercadopago",
         external_reference: String(order.id),
         payer: {
           email: email_cliente,
@@ -433,9 +625,14 @@ app.post("/pedidos", async (req, res) => {
 app.get("/pedido-status", async (req, res) => {
   try {
     const pedidoId = String(req.query.pedido || "").trim()
+    const emailCliente = normalizarEmail(req.query.email)
 
     if (!pedidoId) {
       return res.status(400).json({ erro: "Pedido é obrigatório" })
+    }
+
+    if (!emailCliente) {
+      return res.status(400).json({ erro: "Email é obrigatório" })
     }
 
     const { data: order, error: erroOrder } = await supabase
@@ -446,6 +643,14 @@ app.get("/pedido-status", async (req, res) => {
 
     if (erroOrder || !order) {
       return res.status(404).json({ erro: "Pedido não encontrado" })
+    }
+
+    const emailPedido = normalizarEmail(
+      order.customer_email || order.email_cliente || order.cliente_email
+    )
+
+    if (!emailPedido || emailPedido !== emailCliente) {
+      return res.status(403).json({ erro: "Email não confere com o pedido" })
     }
 
     const { data: orderItem, error: erroOrderItem } = await supabase
