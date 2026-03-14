@@ -9,7 +9,6 @@ const { createClient } = require("@supabase/supabase-js")
 const app = express()
 
 const DEFAULT_ORIGINS = [
-  "https://blackouts-site.vercel.app",
   "https://blackouts.site",
   "https://www.blackouts.site",
   "http://localhost:3000",
