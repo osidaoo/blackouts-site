@@ -64,6 +64,12 @@ body::before{
   top:16px;
   z-index:10;
 }
+.nav-left{
+  display:flex;
+  align-items:center;
+  gap:16px;
+  flex-wrap:wrap;
+}
 .brand{
   font-weight:800;
   letter-spacing:.22em;
@@ -174,13 +180,12 @@ body::before{
 }
 .search-bar{
   display:flex;
-  justify-content:center;
-  gap:10px;
+  align-items:center;
+  gap:8px;
   flex-wrap:wrap;
-  margin:10px 0 18px;
 }
 .search-bar input{
-  width:min(360px, 100%);
+  width:220px;
   margin-bottom:0;
 }
 .hero-stats{
@@ -406,6 +411,8 @@ input{
 
 @media (max-width: 900px){
   .nav{flex-direction:column;gap:12px;}
+  .nav-left{justify-content:center;}
+  .search-bar input{width:min(360px, 100%);}
   .hero h1{font-size:34px;}
   .hero-stats{grid-template-columns:1fr;}
   .support-grid{grid-template-columns:1fr;}
@@ -452,7 +459,13 @@ input{
 <div class="page">
   <div class="container">
     <header class="nav">
-      <div class="brand logo-mark">BLACKOUTS</div>
+      <div class="nav-left">
+        <div class="brand logo-mark">BLACKOUTS</div>
+        <div class="search-bar">
+          <input id="searchInput" type="text" placeholder="Buscar produto..." />
+          <button class="btn btn-primary" id="searchBtn">Buscar</button>
+        </div>
+      </div>
       <div class="nav-links">
         <a href="#categorias">Categorias</a>
         <a href="#destaques">Destaques</a>
@@ -473,10 +486,6 @@ input{
       <div class="hero-actions">
         <a class="btn btn-primary" href="produtos/">Ver produtos</a>
         <a class="btn btn-ghost" href="https://discord.gg/8BB4quCNGP" target="_blank" rel="noopener">Entrar no Discord</a>
-      </div>
-      <div class="search-bar">
-        <input id="searchInput" type="text" placeholder="Buscar produto..." />
-        <button class="btn btn-primary" id="searchBtn">Buscar</button>
       </div>
       <div class="hero-stats">
         <div class="stat-card">
