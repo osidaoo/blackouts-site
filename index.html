@@ -69,6 +69,26 @@ body::before{
   letter-spacing:.22em;
   color:#9dd0ff;
 }
+.logo-mark{
+  position:relative;
+  display:inline-block;
+  font-weight:800;
+  letter-spacing:.2em;
+  color:#9dc7ff;
+  text-shadow:0 0 12px rgba(59,130,246,.6);
+}
+.logo-mark::before,
+.logo-mark::after{
+  content:"";
+  position:absolute;
+  top:50%;
+  width:70px;
+  height:2px;
+  background:linear-gradient(90deg, transparent, rgba(59,130,246,.9), transparent);
+  box-shadow:0 0 12px rgba(59,130,246,.6);
+}
+.logo-mark::before{right:100%;margin-right:16px;}
+.logo-mark::after{left:100%;margin-left:16px;}
 .nav-links{
   display:flex;
   gap:22px;
@@ -118,10 +138,6 @@ body::before{
 }
 .hero-title{
   font-size:38px;
-  font-weight:800;
-  letter-spacing:.25em;
-  color:#8fbeff;
-  text-shadow:0 0 18px rgba(59,130,246,.6);
   margin-bottom:14px;
 }
 .hero h1{
@@ -389,7 +405,7 @@ input{
 <div class="page">
   <div class="container">
     <header class="nav">
-      <div class="brand">BLACKOUTS</div>
+      <div class="brand logo-mark">BLACKOUTS</div>
       <div class="nav-links">
         <a href="#categorias">Categorias</a>
         <a href="#destaques">Destaques</a>
@@ -399,7 +415,7 @@ input{
     </header>
 
     <section class="hero" id="home">
-      <div class="hero-title">BLACKOUTS</div>
+      <div class="hero-title logo-mark">BLACKOUTS</div>
       <h1>A sua vitrine digital premium</h1>
       <p>Compre contas, keys e assinaturas com entrega automática e suporte rápido.</p>
       <div class="hero-badges">
