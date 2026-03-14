@@ -58,6 +58,21 @@
       color:var(--primary2);
     }
 
+    .brand-wrap{
+      display:flex;
+      align-items:center;
+      gap:12px;
+    }
+
+    .logo-mark{
+      width:42px;
+      height:42px;
+      border-radius:12px;
+      border:1px solid var(--line);
+      box-shadow:0 10px 24px rgba(0,0,0,.35);
+      background:#000;
+    }
+
     .subtitle{
       color:var(--muted);
       margin-top:6px;
@@ -350,9 +365,12 @@
 <body>
   <div class="container">
     <div class="topbar">
-      <div>
-        <div class="brand">BLACKOUTS ADMIN</div>
-        <div class="subtitle">Painel de controle, pedidos e faturamento</div>
+      <div class="brand-wrap">
+        <img src="logo.svg" alt="Blackouts" class="logo-mark">
+        <div>
+          <div class="brand">BLACKOUTS ADMIN</div>
+          <div class="subtitle">Painel de controle, pedidos e faturamento</div>
+        </div>
       </div>
 
       <div class="btn-row">
