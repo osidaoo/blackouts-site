@@ -165,6 +165,10 @@
       font-size:13px;
       color:var(--muted);
     }
+
+    .hidden{
+      display:none;
+    }
   </style>
 </head>
 <body>
@@ -181,15 +185,17 @@
 
         <div id="status" class="status"></div>
 
-        <label for="senha">Nova senha</label>
-        <input id="senha" type="password" placeholder="Digite uma senha segura">
+        <div id="formArea">
+          <label for="senha">Nova senha</label>
+          <input id="senha" type="password" placeholder="Digite uma senha segura">
 
-        <label for="confirmar">Confirmar senha</label>
-        <input id="confirmar" type="password" placeholder="Digite novamente">
+          <label for="confirmar">Confirmar senha</label>
+          <input id="confirmar" type="password" placeholder="Digite novamente">
 
-        <div class="actions">
-          <button class="btn btn-primary" id="btnCriar">Salvar senha</button>
-          <a class="btn btn-ghost" href="../entrar/">Ir para entrar</a>
+          <div class="actions">
+            <button class="btn btn-primary" id="btnCriar">Salvar senha</button>
+            <a class="btn btn-ghost" href="../entrar/">Ir para entrar</a>
+          </div>
         </div>
 
         <div class="helper" id="helper"></div>
@@ -219,6 +225,11 @@
     const confirmarEl = document.getElementById("confirmar")
     const btnCriar = document.getElementById("btnCriar")
     const helperEl = document.getElementById("helper")
+    const formArea = document.getElementById("formArea")
+
+    const ROLE_ADMIN = ["admin", "administrador"]
+
+    let sessaoAtual = null
 
     function mostrarStatus(texto, tipo) {
       statusEl.className = "status " + tipo
@@ -228,6 +239,69 @@
     function limparStatus() {
       statusEl.className = "status"
       statusEl.textContent = ""
+    }
+
+    function definirFormularioAtivo(ativo) {
+      if (ativo) {
+        formArea.classList.remove("hidden")
+        senhaEl.disabled = false
+        confirmarEl.disabled = false
+        btnCriar.disabled = false
+        return
+      }
+
+      formArea.classList.add("hidden")
+      senhaEl.disabled = true
+      confirmarEl.disabled = true
+      btnCriar.disabled = true
+    }
+
+    function obterRoleDeUsuario(usuario) {
+      return String(
+        usuario?.user_metadata?.role ||
+        usuario?.app_metadata?.role ||
+        ""
+      ).toLowerCase()
+    }
+
+    async function obterRoleViaProfiles(user) {
+      if (!supabaseClient || !user?.id) {
+        return ""
+      }
+
+      try {
+        const { data, error } = await supabaseClient
+          .from("profiles")
+          .select("role")
+          .eq("id", user.id)
+          .single()
+
+        if (error || !data?.role) {
+          return ""
+        }
+
+        return String(data.role || "").toLowerCase()
+      } catch (error) {
+        return ""
+      }
+    }
+
+    async function resolverRole(user) {
+      const roleProfiles = await obterRoleViaProfiles(user)
+      if (roleProfiles) {
+        return roleProfiles
+      }
+
+      return obterRoleDeUsuario(user)
+    }
+
+    function redirecionarPorRole(role) {
+      if (ROLE_ADMIN.includes(role)) {
+        window.location.href = "../admin/"
+        return
+      }
+
+      window.location.href = "../painel/"
     }
 
     async function obterSessaoInicial() {
@@ -244,7 +318,12 @@
       const code = url.searchParams.get("code")
 
       if (code && supabaseClient.auth.exchangeCodeForSession) {
-        const { data: exchangeData } = await supabaseClient.auth.exchangeCodeForSession(code)
+        const { data: exchangeData, error } = await supabaseClient.auth.exchangeCodeForSession(code)
+
+        if (error) {
+          return null
+        }
+
         return exchangeData?.session || null
       }
 
@@ -254,16 +333,21 @@
     async function prepararPagina() {
       if (!supabaseClient || !SUPABASE_URL || !SUPABASE_ANON_KEY) {
         mostrarStatus("Configure o Supabase em config.js.", "warn")
+        definirFormularioAtivo(false)
         return
       }
 
-      const sessao = await obterSessaoInicial()
-      if (!sessao) {
-        mostrarStatus("Link invalido ou expirado. Solicite um novo convite.", "error")
+      sessaoAtual = await obterSessaoInicial()
+
+      if (!sessaoAtual) {
+        mostrarStatus("Link invalido ou expirado. Use o botao Entrar para acessar sua conta.", "error")
+        helperEl.textContent = ""
+        definirFormularioAtivo(false)
         return
       }
 
-      helperEl.textContent = "Sessao confirmada para " + (sessao.user?.email || "")
+      helperEl.textContent = "Sessao confirmada para " + (sessaoAtual.user?.email || "")
+      definirFormularioAtivo(true)
     }
 
     async function salvarSenha() {
@@ -295,10 +379,22 @@
       }
 
       mostrarStatus("Senha criada com sucesso. Redirecionando...", "ok")
-      await supabaseClient.auth.signOut()
+
+      const { data, error: erroUser } = await supabaseClient.auth.getUser()
+      const user = data?.user || sessaoAtual?.user
+
+      if (erroUser || !user) {
+        setTimeout(() => {
+          window.location.href = "../entrar/"
+        }, 1200)
+        return
+      }
+
+      const role = await resolverRole(user)
+
       setTimeout(() => {
-        window.location.href = "../entrar/"
-      }, 1200)
+        redirecionarPorRole(role)
+      }, 900)
     }
 
     btnCriar.addEventListener("click", salvarSenha)

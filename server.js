@@ -89,6 +89,27 @@ function obterRoleUsuario(user) {
   ).toLowerCase()
 }
 
+async function obterRolePerfil(userId) {
+  if (!userId) {
+    return null
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", userId)
+      .maybeSingle()
+
+    if (error) {
+      return null
+    }
+
+    return data?.role ? String(data.role).toLowerCase() : null
+  } catch (error) {
+    return null
+  }
+}
 async function autenticarSupabase(req, res, next) {
   const authHeader = req.headers.authorization
 
@@ -108,10 +129,12 @@ async function autenticarSupabase(req, res, next) {
     return res.status(401).json({ erro: "Token expirado ou inválido" })
   }
 
+  const rolePerfil = await obterRolePerfil(data.user.id)
+
   req.usuario = {
     id: data.user.id,
     email: data.user.email,
-    papel: obterRoleUsuario(data.user)
+    papel: rolePerfil || obterRoleUsuario(data.user)
   }
   req.usuarioRaw = data.user
   next()
@@ -180,7 +203,64 @@ function normalizarEmail(email) {
   return String(email || "").trim().toLowerCase()
 }
 
+const CATEGORIAS_VALIDAS = [
+  "games",
+  "assinaturas",
+  "steam keys",
+  "ia",
+  "outros"
+]
+
 const STATUS_ESTOQUE_DISPONIVEL = ["available", "disponivel", "ativo", "livre"]
+
+function normalizarBoolean(valor, padrao = false) {
+  if (valor === undefined || valor === null) return padrao
+  if (typeof valor === "boolean") return valor
+
+  const texto = String(valor).trim().toLowerCase()
+  if (["1", "true", "sim", "yes", "on"].includes(texto)) return true
+  if (["0", "false", "nao", "no", "off"].includes(texto)) return false
+  return padrao
+}
+
+function normalizarCategoria(categoria) {
+  const valor = String(categoria || "").trim().toLowerCase()
+
+  if (!valor) return "outros"
+  if (["steam_keys", "steam-keys", "steamkey", "steam key"].includes(valor)) return "steam keys"
+  if (["ia", "ias", "inteligencia artificial"].includes(valor)) return "ia"
+  if (["assinatura", "assinaturas"].includes(valor)) return "assinaturas"
+  if (["game", "games"].includes(valor)) return "games"
+  if (["outro", "outros"].includes(valor)) return "outros"
+
+  return CATEGORIAS_VALIDAS.includes(valor) ? valor : "outros"
+}
+
+function gerarSlug(texto) {
+  return String(texto || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .toLowerCase()
+}
+
+function normalizarPrecoPromocional(preco, promo) {
+  const precoBase = Number(preco || 0)
+  const promoNumber = promo === null || promo === undefined ? null : Number(promo)
+
+  if (!promoNumber || Number.isNaN(promoNumber)) return null
+  if (promoNumber <= 0) return null
+  if (precoBase > 0 && promoNumber >= precoBase) return null
+
+  return promoNumber
+}
+
+function calcularPrecoFinal(preco, precoPromocional) {
+  const precoBase = Number(preco || 0)
+  const promoValido = normalizarPrecoPromocional(precoBase, precoPromocional)
+  return promoValido ?? precoBase
+}
 
 function criarRateLimiter({ windowMs, max, message }) {
   const hits = new Map()
@@ -217,11 +297,34 @@ function criarRateLimiter({ windowMs, max, message }) {
   }
 }
 
-async function carregarProdutosComEstoque({ orderBy } = {}) {
+async function carregarProdutosComEstoque({
+  orderBy,
+  orderDirection = "asc",
+  apenasAtivos = false,
+  categoria,
+  apenasDestaque = false,
+  limit
+} = {}) {
   let query = supabase.from("products").select("*")
 
+  if (apenasAtivos) {
+    query = query.eq("ativo", true)
+  }
+
+  if (categoria) {
+    query = query.eq("categoria", categoria)
+  }
+
+  if (apenasDestaque) {
+    query = query.eq("destaque", true)
+  }
+
   if (orderBy) {
-    query = query.order(orderBy, { ascending: true })
+    query = query.order(orderBy, { ascending: orderDirection === "asc" })
+  }
+
+  if (limit) {
+    query = query.limit(limit)
   }
 
   const { data: produtos, error } = await query
@@ -256,10 +359,44 @@ async function carregarProdutosComEstoque({ orderBy } = {}) {
     estoquePorProduto[productId] = (estoquePorProduto[productId] || 0) + 1
   }
 
-  const produtosComEstoque = (produtos || []).map((produto) => ({
-    ...produto,
-    stock_available: estoquePorProduto[produto.id] || 0
-  }))
+  const produtosComEstoque = (produtos || []).map((produto) => {
+    const nome = produto.nome ?? produto.name ?? produto.title ?? ""
+    const descricao = produto.descricao ?? produto.description ?? ""
+    const preco = Number(produto.preco ?? produto.price ?? 0)
+    const precoPromocional = normalizarPrecoPromocional(preco, produto.preco_promocional ?? produto.precoPromocional)
+    const bannerUrl = produto.banner_url ?? produto.bannerUrl ?? produto.image_url ?? null
+    const categoriaProduto = normalizarCategoria(produto.categoria ?? produto.type ?? "outros")
+    const quantidade =
+      produto.quantidade === null || produto.quantidade === undefined
+        ? null
+        : Number(produto.quantidade)
+    const inventoryDisponivel = estoquePorProduto[produto.id] || 0
+
+    let estoqueDisponivel = inventoryDisponivel
+    if (quantidade !== null && !Number.isNaN(quantidade)) {
+      estoqueDisponivel = Math.min(quantidade, inventoryDisponivel)
+    }
+
+    return {
+      id: produto.id,
+      nome,
+      slug: produto.slug || (nome ? gerarSlug(nome) : null),
+      categoria: categoriaProduto,
+      descricao,
+      banner_url: bannerUrl,
+      preco,
+      preco_promocional: precoPromocional,
+      quantidade: quantidade !== null && !Number.isNaN(quantidade) ? quantidade : null,
+      ativo: produto.ativo !== undefined ? Boolean(produto.ativo) : true,
+      destaque: produto.destaque !== undefined ? Boolean(produto.destaque) : false,
+      total_vendas: Number(produto.total_vendas ?? 0),
+      created_at: produto.created_at || null,
+      updated_at: produto.updated_at || null,
+      inventory_available: inventoryDisponivel,
+      stock_available: estoqueDisponivel,
+      preco_final: calcularPrecoFinal(preco, precoPromocional)
+    }
+  })
 
   return { data: produtosComEstoque }
 }
@@ -338,6 +475,7 @@ async function reservarItemEstoqueAtomico(productId) {
 }
 
 async function registrarAlertaSemEstoque({ orderId, paymentId, productId, email }) {
+
   try {
     const { error } = await supabase
       .from("stock_alerts")
@@ -355,6 +493,51 @@ async function registrarAlertaSemEstoque({ orderId, paymentId, productId, email 
   } catch (error) {
     console.log("Erro ao registrar alerta de estoque:", error)
   }
+}
+
+async function registrarVendaProduto(productId) {
+  if (!productId) {
+    return { data: null }
+  }
+
+  const { data, error } = await supabase.rpc("register_product_sale", {
+    p_product_id: String(productId)
+  })
+
+  if (!error) {
+    return { data }
+  }
+
+  const { data: produto, error: erroProduto } = await supabase
+    .from("products")
+    .select("total_vendas, quantidade")
+    .eq("id", productId)
+    .single()
+
+  if (erroProduto) {
+    return { error: erroProduto }
+  }
+
+  const totalVendas = Number(produto?.total_vendas || 0) + 1
+  let quantidade = produto?.quantidade
+  const atualizacao = { total_vendas: totalVendas }
+
+  if (quantidade !== null && quantidade !== undefined) {
+    const quantidadeNumero = Number(quantidade || 0)
+    atualizacao.quantidade = Math.max(quantidadeNumero - 1, 0)
+  }
+
+  const { data: atualizado, error: erroAtualiza } = await supabase
+    .from("products")
+    .update(atualizacao)
+    .eq("id", productId)
+    .select()
+
+  if (erroAtualiza) {
+    return { error: erroAtualiza }
+  }
+
+  return { data: atualizado }
 }
 
 async function convidarClienteSeNecessario({ email, nome }) {
@@ -415,13 +598,57 @@ app.get("/teste-login", (req, res) => {
 
 app.get("/produtos", async (req, res) => {
   try {
-    const { data, error } = await carregarProdutosComEstoque({ orderBy: "name" })
+    const categoria = req.query.categoria ? normalizarCategoria(req.query.categoria) : null
+    const apenasDestaque = normalizarBoolean(req.query.destaque, false)
+    const ordem = String(req.query.ordem || req.query.order || "").trim().toLowerCase()
+    const limite = req.query.limite || req.query.limit
+    const limiteNumero = limite ? Number(limite) : null
+
+    let orderBy = "created_at"
+    let orderDirection = "desc"
+
+    if (ordem === "mais_vendidos" || ordem === "mais-vendidos" || ordem === "total_vendas") {
+      orderBy = "total_vendas"
+      orderDirection = "desc"
+    } else if (ordem === "nome" || ordem === "name") {
+      orderBy = "nome"
+      orderDirection = "asc"
+    }
+
+    const { data, error } = await carregarProdutosComEstoque({
+      orderBy,
+      orderDirection,
+      apenasAtivos: true,
+      categoria,
+      apenasDestaque,
+      limit: Number.isFinite(limiteNumero) ? limiteNumero : undefined
+    })
 
     if (error) return res.status(500).json({ erro: error.message })
 
     res.json(data || [])
   } catch (error) {
     res.status(500).json({ erro: "Erro ao buscar produtos" })
+  }
+})
+
+app.get("/produtos/mais-vendidos", async (req, res) => {
+  try {
+    const limite = req.query.limite || req.query.limit
+    const limiteNumero = limite ? Number(limite) : 6
+
+    const { data, error } = await carregarProdutosComEstoque({
+      orderBy: "total_vendas",
+      orderDirection: "desc",
+      apenasAtivos: true,
+      limit: Number.isFinite(limiteNumero) ? limiteNumero : 6
+    })
+
+    if (error) return res.status(500).json({ erro: error.message })
+
+    res.json(data || [])
+  } catch (error) {
+    res.status(500).json({ erro: "Erro ao buscar mais vendidos" })
   }
 })
 
@@ -486,7 +713,10 @@ app.get("/admin/dashboard", autenticarSupabase, somenteAdminSupabase, async (req
 
 app.get("/admin/produtos", autenticarSupabase, somenteAdminSupabase, async (req, res) => {
   try {
-    const { data, error } = await carregarProdutosComEstoque({ orderBy: "created_at" })
+    const { data, error } = await carregarProdutosComEstoque({
+      orderBy: "created_at",
+      orderDirection: "desc"
+    })
 
     if (error) return res.status(500).json({ erro: error.message })
 
@@ -498,21 +728,38 @@ app.get("/admin/produtos", autenticarSupabase, somenteAdminSupabase, async (req,
 
 app.post("/admin/produtos", autenticarSupabase, somenteAdminSupabase, async (req, res) => {
   try {
-    const { name, slug, type, price, description, image_url } = req.body
+    const nome = req.body.nome ?? req.body.name
+    const slugInput = req.body.slug
+    const categoria = normalizarCategoria(req.body.categoria ?? req.body.category ?? req.body.type)
+    const descricao = req.body.descricao ?? req.body.description ?? null
+    const bannerUrl = req.body.banner_url ?? req.body.bannerUrl ?? req.body.image_url ?? null
+    const preco = Number(req.body.preco ?? req.body.price ?? 0)
+    const precoPromocional = normalizarPrecoPromocional(preco, req.body.preco_promocional ?? req.body.precoPromocional)
+    const quantidade = req.body.quantidade ?? req.body.quantity ?? 0
+    const ativo = normalizarBoolean(req.body.ativo, true)
+    const destaque = normalizarBoolean(req.body.destaque, false)
 
-    if (!name || price === undefined) {
+    if (!nome || preco === undefined || Number.isNaN(preco)) {
       return res.status(400).json({ erro: "Nome e preço são obrigatórios" })
     }
+
+    const slugFinal = slugInput ? gerarSlug(slugInput) : gerarSlug(nome)
+    const quantidadeNumero = Math.max(Number(quantidade || 0), 0)
 
     const { data, error } = await supabase
       .from("products")
       .insert([{
-        name,
-        slug: slug || null,
-        type: type || "account",
-        price: Number(price),
-        description: description || null,
-        image_url: image_url || null
+        nome,
+        slug: slugFinal || null,
+        categoria,
+        descricao,
+        banner_url: bannerUrl || null,
+        preco,
+        preco_promocional: precoPromocional,
+        quantidade: quantidadeNumero,
+        ativo,
+        destaque,
+        total_vendas: 0
       }])
       .select()
 
@@ -523,26 +770,69 @@ app.post("/admin/produtos", autenticarSupabase, somenteAdminSupabase, async (req
     res.status(500).json({ erro: "Erro ao criar produto" })
   }
 })
-
 app.put("/admin/produtos/:id", autenticarSupabase, somenteAdminSupabase, async (req, res) => {
   try {
     const { id } = req.params
-    const { name, slug, type, price, description, image_url } = req.body
 
-    if (!name || price === undefined) {
-      return res.status(400).json({ erro: "Nome e preço são obrigatórios" })
+    const atualizacao = {}
+
+    if (req.body.nome !== undefined || req.body.name !== undefined) {
+      const nome = req.body.nome ?? req.body.name
+      if (!nome) {
+        return res.status(400).json({ erro: "Nome é obrigatório" })
+      }
+      atualizacao.nome = nome
+    }
+
+    if (req.body.slug !== undefined) {
+      atualizacao.slug = req.body.slug ? gerarSlug(req.body.slug) : null
+    }
+
+    if (req.body.categoria !== undefined || req.body.category !== undefined || req.body.type !== undefined) {
+      atualizacao.categoria = normalizarCategoria(req.body.categoria ?? req.body.category ?? req.body.type)
+    }
+
+    if (req.body.descricao !== undefined || req.body.description !== undefined) {
+      atualizacao.descricao = req.body.descricao ?? req.body.description ?? null
+    }
+
+    if (req.body.banner_url !== undefined || req.body.bannerUrl !== undefined || req.body.image_url !== undefined) {
+      atualizacao.banner_url = req.body.banner_url ?? req.body.bannerUrl ?? req.body.image_url ?? null
+    }
+
+    if (req.body.preco !== undefined || req.body.price !== undefined) {
+      const preco = Number(req.body.preco ?? req.body.price)
+      if (Number.isNaN(preco)) {
+        return res.status(400).json({ erro: "Preço inválido" })
+      }
+      atualizacao.preco = preco
+      const promo = normalizarPrecoPromocional(preco, req.body.preco_promocional ?? req.body.precoPromocional)
+      atualizacao.preco_promocional = promo
+    } else if (req.body.preco_promocional !== undefined || req.body.precoPromocional !== undefined) {
+      const precoBase = Number(req.body.preco_base ?? req.body.preco ?? req.body.price ?? 0)
+      atualizacao.preco_promocional = normalizarPrecoPromocional(precoBase, req.body.preco_promocional ?? req.body.precoPromocional)
+    }
+
+    if (req.body.quantidade !== undefined || req.body.quantity !== undefined) {
+      const quantidade = Math.max(Number(req.body.quantidade ?? req.body.quantity ?? 0), 0)
+      atualizacao.quantidade = quantidade
+    }
+
+    if (req.body.ativo !== undefined) {
+      atualizacao.ativo = normalizarBoolean(req.body.ativo, true)
+    }
+
+    if (req.body.destaque !== undefined) {
+      atualizacao.destaque = normalizarBoolean(req.body.destaque, false)
+    }
+
+    if (!Object.keys(atualizacao).length) {
+      return res.status(400).json({ erro: "Nenhum campo para atualizar" })
     }
 
     const { data, error } = await supabase
       .from("products")
-      .update({
-        name,
-        slug: slug || null,
-        type: type || "account",
-        price: Number(price),
-        description: description || null,
-        image_url: image_url || null
-      })
+      .update(atualizacao)
       .eq("id", id)
       .select()
 
@@ -558,16 +848,17 @@ app.delete("/admin/produtos/:id", autenticarSupabase, somenteAdminSupabase, asyn
   try {
     const { id } = req.params
 
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from("products")
-      .delete()
+      .update({ ativo: false })
       .eq("id", id)
+      .select()
 
     if (error) return res.status(500).json({ erro: error.message })
 
-    res.json({ sucesso: true })
+    res.json({ sucesso: true, produto: data?.[0] || null })
   } catch (error) {
-    res.status(500).json({ erro: "Erro ao deletar produto" })
+    res.status(500).json({ erro: "Erro ao inativar produto" })
   }
 })
 
@@ -577,7 +868,7 @@ app.get("/admin/pedidos", autenticarSupabase, somenteAdminSupabase, async (req, 
       .from("orders")
       .select(`
         *,
-        order_items (*, products (name)),
+        order_items (*, products (nome, name, banner_url, preco, preco_promocional)),
         payments (*)
       `)
       .order("created_at", { ascending: false })
@@ -589,7 +880,6 @@ app.get("/admin/pedidos", autenticarSupabase, somenteAdminSupabase, async (req, 
     res.status(500).json({ erro: "Erro ao buscar pedidos" })
   }
 })
-
 app.get("/admin/estoque", autenticarSupabase, somenteAdminSupabase, async (req, res) => {
   try {
     const produtoFiltro = String(req.query.product_id || req.query.produto || "").trim()
@@ -609,12 +899,12 @@ app.get("/admin/estoque", autenticarSupabase, somenteAdminSupabase, async (req, 
 
     const { data: produtos, error: erroProdutos } = await supabase
       .from("products")
-      .select("id, name")
+      .select("id, nome, name")
 
     if (erroProdutos) return res.status(500).json({ erro: erroProdutos.message })
 
     const produtosMap = new Map(
-      (produtos || []).map((produto) => [produto.id, produto.name])
+      (produtos || []).map((produto) => [produto.id, produto.nome || produto.name])
     )
 
     const resposta = (estoque || []).map((item) => ({
@@ -734,7 +1024,7 @@ app.get("/cliente/pedidos", autenticarSupabase, somenteClienteSupabase, async (r
       .from("orders")
       .select(`
         *,
-        order_items (*, products (name))
+        order_items (*, products (nome, name, banner_url, preco, preco_promocional))
       `)
       .ilike("customer_email", email)
       .order("created_at", { ascending: false })
@@ -770,6 +1060,29 @@ app.post("/pedidos", rateLimitPedidos, async (req, res) => {
       return res.status(404).json({ erro: "Produto não encontrado" })
     }
 
+    const nomeProduto = produto.nome ?? produto.name ?? "Produto"
+    const precoBase = Number(produto.preco ?? produto.price ?? 0)
+    const precoPromocional = normalizarPrecoPromocional(precoBase, produto.preco_promocional ?? produto.precoPromocional)
+    const precoFinal = calcularPrecoFinal(precoBase, precoPromocional)
+    const quantidadeProduto = produto.quantidade ?? produto.quantity
+    const quantidadeNumero =
+      quantidadeProduto === null || quantidadeProduto === undefined
+        ? null
+        : Number(quantidadeProduto)
+    const ativoProduto = produto.ativo !== undefined ? Boolean(produto.ativo) : true
+
+    if (!ativoProduto) {
+      return res.status(409).json({ erro: "Produto inativo no momento" })
+    }
+
+    if (precoBase <= 0 || Number.isNaN(precoBase)) {
+      return res.status(400).json({ erro: "Preço inválido do produto" })
+    }
+
+    if (quantidadeNumero !== null && (Number.isNaN(quantidadeNumero) || quantidadeNumero <= 0)) {
+      return res.status(409).json({ erro: "Produto sem estoque disponível" })
+    }
+
     const { available: estoqueDisponivel, error: erroEstoqueDisponivel } =
       await verificarEstoqueDisponivel(produto.id)
 
@@ -784,7 +1097,7 @@ app.post("/pedidos", rateLimitPedidos, async (req, res) => {
     const payloadOrder = {
       user_id: null,
       status: "pending",
-      total: Number(produto.price),
+      total: Number(precoFinal),
       payment_status: "pending",
       customer_name: nome_cliente,
       customer_email: email_cliente
@@ -800,7 +1113,7 @@ app.post("/pedidos", rateLimitPedidos, async (req, res) => {
       const payloadFallback = {
         user_id: null,
         status: "pending",
-        total: Number(produto.price),
+        total: Number(precoFinal),
         payment_status: "pending"
       }
 
@@ -825,7 +1138,7 @@ app.post("/pedidos", rateLimitPedidos, async (req, res) => {
       .insert([{
         order_id: order.id,
         product_id: produto.id,
-        price: Number(produto.price),
+        price: Number(precoFinal),
         quantity: 1,
         delivery_status: "pending",
         delivered_content: null
@@ -845,8 +1158,8 @@ app.post("/pedidos", rateLimitPedidos, async (req, res) => {
         "X-Idempotency-Key": `order-${order.id}-${Date.now()}`
       },
       body: JSON.stringify({
-        transaction_amount: Number(produto.price),
-        description: produto.name,
+        transaction_amount: Number(precoFinal),
+        description: nomeProduto,
         payment_method_id: "pix",
         notification_url: "https://api.blackouts.site/webhook/mercadopago",
         external_reference: String(order.id),
@@ -883,7 +1196,7 @@ app.post("/pedidos", rateLimitPedidos, async (req, res) => {
         provider: "mercadopago",
         provider_payment_id: String(mpData.id),
         status: mpData.status || "pending",
-        amount: Number(produto.price)
+        amount: Number(precoFinal)
       }])
 
     if (erroPagamento) {
@@ -952,9 +1265,13 @@ app.get("/pedido-status", rateLimitPedidoStatus, async (req, res) => {
       return res.status(404).json({ erro: "Item do pedido não encontrado" })
     }
 
+    const statusPagamento = String(order.payment_status || "").toLowerCase()
+
+    const pago = ["paid", "approved"].includes(statusPagamento)
+
     let entrega = null
 
-    if (orderItem.delivered_content) {
+    if (pago && orderItem.delivered_content) {
       try {
         entrega = JSON.parse(orderItem.delivered_content)
       } catch {
@@ -969,8 +1286,8 @@ app.get("/pedido-status", rateLimitPedidoStatus, async (req, res) => {
         payment_status: order.payment_status,
         total: order.total,
         criado_em: order.created_at,
-        produto_nome: orderItem.products?.name || null,
-        entregue_em: order.payment_status === "paid" ? order.created_at : null
+        produto_nome: orderItem.products?.nome || orderItem.products?.name || null,
+        entregue_em: pago ? order.created_at : null
       },
       entrega
     })
@@ -1135,6 +1452,8 @@ app.post("/webhook/mercadopago", async (req, res) => {
         email: order.customer_email || order.email_cliente || order.cliente_email || null
       })
 
+      await registrarVendaProduto(orderItem.product_id)
+
       await convidarClienteSeNecessario({
         email: order.customer_email || order.email_cliente || order.cliente_email || null,
         nome: order.customer_name || order.nome_cliente || order.cliente_nome || null
@@ -1189,6 +1508,8 @@ app.post("/webhook/mercadopago", async (req, res) => {
       return res.status(500).send("erro ao atualizar pagamento")
     }
 
+
+    await registrarVendaProduto(orderItem.product_id)
     console.log("CONTA ENTREGUE:", contaDisponivel.content_login)
 
     await convidarClienteSeNecessario({
@@ -1206,3 +1527,17 @@ app.post("/webhook/mercadopago", async (req, res) => {
 app.listen(PORT, () => {
   console.log("Servidor rodando na porta", PORT)
 })
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -1,4 +1,4 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
@@ -171,6 +171,17 @@ body::before{
   gap:14px;
   flex-wrap:wrap;
   margin-bottom:24px;
+}
+.search-bar{
+  display:flex;
+  justify-content:center;
+  gap:10px;
+  flex-wrap:wrap;
+  margin:10px 0 18px;
+}
+.search-bar input{
+  width:min(360px, 100%);
+  margin-bottom:0;
 }
 .hero-stats{
   display:grid;
@@ -399,7 +410,43 @@ input{
   .hero-stats{grid-template-columns:1fr;}
   .support-grid{grid-template-columns:1fr;}
 }
-</style>
+.product-desc{
+  color:var(--muted);
+  font-size:13px;
+  line-height:1.45;
+  margin-bottom:12px;
+  min-height:38px;
+}
+.price-line{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  margin-bottom:10px;
+}
+.price-old{
+  color:var(--muted);
+  font-size:13px;
+  text-decoration:line-through;
+}
+.price-current{
+  font-size:20px;
+  font-weight:700;
+  color:#a8d2ff;
+}
+.product-card.disabled{
+  opacity:.55;
+}
+.stock.soldout{
+  color:#ff9aa6;
+  font-weight:600;
+}
+.btn:disabled,
+.btn[disabled]{
+  cursor:not-allowed;
+  opacity:.6;
+  box-shadow:none;
+  transform:none;
+}</style>
 </head>
 <body>
 <div class="page">
@@ -427,6 +474,10 @@ input{
         <a class="btn btn-primary" href="produtos/">Ver produtos</a>
         <a class="btn btn-ghost" href="https://discord.gg/8BB4quCNGP" target="_blank" rel="noopener">Entrar no Discord</a>
       </div>
+      <div class="search-bar">
+        <input id="searchInput" type="text" placeholder="Buscar produto..." />
+        <button class="btn btn-primary" id="searchBtn">Buscar</button>
+      </div>
       <div class="hero-stats">
         <div class="stat-card">
           <strong>4.9/5</strong>
@@ -443,32 +494,32 @@ input{
       </div>
     </section>
 
-    <section class="section" id="categorias">
+        <section class="section" id="categorias">
       <div class="section-head">
         <h2>Categorias</h2>
         <p>Explore as categorias disponíveis na loja.</p>
       </div>
       <div class="category-grid">
-        <div class="category-card">
-          <div class="category-icon">🎮</div>
+        <a class="category-card" href="produtos/?categoria=games">
+          <div class="category-icon">&#127918;</div>
           <h3>Games</h3>
           <p>Contas e itens premium.</p>
-        </div>
-        <div class="category-card">
-          <div class="category-icon">📺</div>
+        </a>
+        <a class="category-card" href="produtos/?categoria=assinaturas">
+          <div class="category-icon">&#128250;</div>
           <h3>Assinaturas</h3>
           <p>Streaming e serviços.</p>
-        </div>
-        <div class="category-card">
-          <div class="category-icon">🔑</div>
+        </a>
+        <a class="category-card" href="produtos/?categoria=steam%20keys">
+          <div class="category-icon">&#128273;</div>
           <h3>Steam Keys</h3>
           <p>Chaves digitais.</p>
-        </div>
-        <div class="category-card">
-          <div class="category-icon">🧠</div>
+        </a>
+        <a class="category-card" href="produtos/?categoria=ia">
+          <div class="category-icon">&#129504;</div>
           <h3>IA's</h3>
           <p>Ferramentas e créditos.</p>
-        </div>
+        </a>
       </div>
     </section>
 
@@ -479,6 +530,16 @@ input{
       </div>
       <div id="produtos" class="products-grid">
         <div class="loading">Carregando produtos...</div>
+      </div>
+    </section>
+
+        <section class="section" id="mais-vendidos">
+      <div class="section-head">
+        <h2>Mais vendidos</h2>
+        <p>Os produtos mais populares da loja no momento.</p>
+      </div>
+      <div id="maisVendidos" class="products-grid">
+        <div class="loading">Carregando mais vendidos...</div>
       </div>
     </section>
 
@@ -548,53 +609,124 @@ input{
 const CONFIG = window.__CONFIG__ || {}
 const API_URL = CONFIG.API_URL || "https://blackouts-site.onrender.com"
 
-function normalizeImageUrl(url){
+const produtosContainer = document.getElementById("produtos")
+const maisVendidosContainer = document.getElementById("maisVendidos")
+const searchInput = document.getElementById("searchInput")
+const searchBtn = document.getElementById("searchBtn")
+const produtosCache = new Map()
+
+function formatarMoeda(valor) {
+  return Number(valor || 0).toLocaleString("pt-BR", {
+    style: "currency",
+    currency: "BRL"
+  })
+}
+
+function normalizarImagem(url) {
   const raw = String(url || "").trim()
   if (!raw) return ""
   return raw.replace(/"/g, "&quot;")
 }
 
-async function carregarProdutos(){
-  const container = document.getElementById("produtos")
+function resumirTexto(texto, limite) {
+  const valor = String(texto || "").trim()
+  if (!valor) return "Entrega automática via Pix"
+  if (valor.length <= limite) return valor
+  return valor.slice(0, limite).trim() + "..."
+}
 
-  try{
-    const res = await fetch(API_URL + "/produtos")
-    const produtos = await res.json()
+function obterPrecoFinal(produto) {
+  const preco = Number(produto.preco ?? produto.price ?? 0)
+  const promo = Number(produto.preco_promocional ?? 0)
+  if (promo && !Number.isNaN(promo) && promo > 0 && promo < preco) {
+    return { preco, promo, final: promo }
+  }
+  return { preco, promo: null, final: preco }
+}
 
-    if(!produtos.length){
-      container.innerHTML = "Nenhum produto disponível."
-      return
+function montarCardProduto(produto) {
+  const nome = produto.nome ?? produto.name ?? "Produto"
+  const descricao = resumirTexto(produto.descricao ?? produto.description, 90)
+  const estoque = Number(produto.stock_available ?? produto.estoque ?? 0)
+  const ativo = produto.ativo !== undefined ? Boolean(produto.ativo) : true
+  const imagem = normalizarImagem(produto.banner_url ?? produto.image_url ?? produto.image)
+  const letra = nome ? nome.charAt(0).toUpperCase() : "B"
+  const thumbStyle = imagem ? `style="background-image:url('${imagem}')"` : ""
+  const { preco, promo, final } = obterPrecoFinal(produto)
+  const indisponivel = !ativo || estoque <= 0
+
+  return `
+    <div class="product-card ${indisponivel ? "disabled" : ""}">
+      <div class="product-thumb" ${thumbStyle}>${imagem ? "" : letra}</div>
+      <h3>${nome}</h3>
+      <div class="product-desc">${descricao}</div>
+      <div class="price-line">
+        ${promo ? `<span class="price-old">${formatarMoeda(preco)}</span>` : ""}
+        <span class="price-current">${formatarMoeda(final)}</span>
+      </div>
+      <div class="stock ${indisponivel ? "soldout" : ""}">
+        ${indisponivel ? "Indisponível" : `Estoque: ${estoque}`}
+      </div>
+      <button class="btn btn-primary" onclick="abrirModal(${produto.id})" ${indisponivel ? "disabled" : ""}>
+        Comprar
+      </button>
+    </div>
+  `
+}
+
+function renderProdutos(lista, container, fallback) {
+  if (!container) return
+
+  if (!Array.isArray(lista) || !lista.length) {
+    container.innerHTML = `<div class="loading">${fallback}</div>`
+    return
+  }
+
+  lista.forEach((produto) => {
+    if (produto?.id !== undefined && produto?.id !== null) {
+      produtosCache.set(String(produto.id), produto)
+    }
+  })
+
+  container.innerHTML = lista.map(montarCardProduto).join("")
+}
+
+async function carregarDestaques() {
+  try {
+    let resposta = await fetch(API_URL + "/produtos?destaque=true&limite=6")
+    let dados = await resposta.json()
+
+    if (!Array.isArray(dados) || !dados.length) {
+      resposta = await fetch(API_URL + "/produtos?limite=6")
+      dados = await resposta.json()
     }
 
-    let html = ""
-
-    produtos.forEach(produto => {
-      const nome = produto.name ?? produto.nome ?? "-"
-      const preco = Number(produto.price ?? produto.preco ?? 0)
-      const estoque = produto.stock_available ?? produto.estoque ?? "-"
-      const imagem = normalizeImageUrl(produto.image_url ?? produto.image ?? "")
-      const letra = nome ? nome.charAt(0).toUpperCase() : "B"
-      const thumbStyle = imagem ? `style="background-image:url('${imagem}')"` : ""
-
-      html += `
-        <div class="product-card">
-          <div class="product-thumb" ${thumbStyle}>${imagem ? "" : letra}</div>
-          <h3>${nome}</h3>
-          <div class="price">R$ ${preco.toFixed(2)}</div>
-          <div class="product-meta">Entrega automática via Pix</div>
-          <div class="stock">Estoque: ${estoque}</div>
-          <button class="btn btn-primary" onclick="abrirModal(${produto.id})">Comprar</button>
-        </div>
-      `
-    })
-
-    container.innerHTML = html
-  }catch(e){
-    container.innerHTML = "Erro ao carregar produtos"
+    renderProdutos(dados, produtosContainer, "Nenhum produto em destaque.")
+  } catch (error) {
+    renderProdutos([], produtosContainer, "Erro ao carregar produtos.")
   }
 }
 
-function abrirModal(produtoId){
+async function carregarMaisVendidos() {
+  try {
+    const resposta = await fetch(API_URL + "/produtos/mais-vendidos?limite=6")
+    const dados = await resposta.json()
+    renderProdutos(dados, maisVendidosContainer, "Nenhum produto encontrado.")
+  } catch (error) {
+    renderProdutos([], maisVendidosContainer, "Erro ao carregar mais vendidos.")
+  }
+}
+
+function abrirModal(produtoId) {
+  const produto = produtosCache.get(String(produtoId))
+  const estoque = Number(produto?.stock_available ?? 0)
+  const ativo = produto?.ativo !== undefined ? Boolean(produto?.ativo) : true
+
+  if (produto && (!ativo || estoque <= 0)) {
+    mostrarStatusPedido("Produto indisponível no momento.", "error")
+    return
+  }
+
   document.getElementById("produtoIdPedido").value = produtoId
   document.getElementById("modalBg").style.display = "flex"
   limparStatusPedido()
@@ -605,7 +737,7 @@ function abrirModal(produtoId){
   document.getElementById("linkEntrega").innerHTML = ""
 }
 
-function fecharModal(){
+function fecharModal() {
   document.getElementById("modalBg").style.display = "none"
   document.getElementById("produtoIdPedido").value = ""
   document.getElementById("nomeCliente").value = ""
@@ -618,29 +750,39 @@ function fecharModal(){
   document.getElementById("linkEntrega").innerHTML = ""
 }
 
-function mostrarStatusPedido(texto, tipo){
+function mostrarStatusPedido(texto, tipo) {
   const el = document.getElementById("pedidoStatus")
   el.className = "status " + tipo
   el.textContent = texto
 }
 
-function limparStatusPedido(){
+function limparStatusPedido() {
   const el = document.getElementById("pedidoStatus")
   el.className = "status"
   el.textContent = ""
 }
 
-async function enviarPedido(){
+async function enviarPedido() {
   const produto_id = Number(document.getElementById("produtoIdPedido").value)
   const nome_cliente = document.getElementById("nomeCliente").value.trim()
   const email_cliente = document.getElementById("emailCliente").value.trim()
 
-  if(!produto_id || !nome_cliente || !email_cliente){
+  if (!produto_id || !nome_cliente || !email_cliente) {
     mostrarStatusPedido("Preencha nome e email.", "error")
     return
   }
 
-  try{
+  const produto = produtosCache.get(String(produto_id))
+  if (produto) {
+    const estoque = Number(produto.stock_available ?? 0)
+    const ativo = produto.ativo !== undefined ? Boolean(produto.ativo) : true
+    if (!ativo || estoque <= 0) {
+      mostrarStatusPedido("Produto indisponível no momento.", "error")
+      return
+    }
+  }
+
+  try {
     const res = await fetch(API_URL + "/pedidos", {
       method: "POST",
       headers: {
@@ -655,15 +797,15 @@ async function enviarPedido(){
 
     const dados = await res.json()
 
-    if(!res.ok){
+    if (!res.ok) {
       mostrarStatusPedido(dados.erro || "Erro ao gerar pedido Pix.", "error")
       return
     }
 
     mostrarStatusPedido("Pix gerado com sucesso. Faça o pagamento e acompanhe a entrega pelo link abaixo.", "ok")
 
-    if(dados.pix){
-      if(dados.pix.qr_code_base64){
+    if (dados.pix) {
+      if (dados.pix.qr_code_base64) {
         document.getElementById("pixQrImage").src = "data:image/png;base64," + dados.pix.qr_code_base64
       }
 
@@ -671,7 +813,7 @@ async function enviarPedido(){
       document.getElementById("pixBox").style.display = "block"
     }
 
-    if(dados.entrega_url){
+    if (dados.entrega_url) {
       const box = document.getElementById("linkEntrega")
       box.innerHTML = `
         <strong>Link de acompanhamento da entrega:</strong><br><br>
@@ -679,28 +821,27 @@ async function enviarPedido(){
       `
       box.style.display = "block"
     }
-
-  }catch(e){
+  } catch (error) {
     mostrarStatusPedido("Erro ao conectar com a API.", "error")
   }
 }
 
-async function copiarPix(){
+async function copiarPix() {
   const texto = document.getElementById("pixCode").value
 
-  if(!texto){
+  if (!texto) {
     return
   }
 
-  try{
+  try {
     await navigator.clipboard.writeText(texto)
     alert("Código Pix copiado.")
-  }catch(e){
+  } catch (error) {
     alert("Não foi possível copiar o código.")
   }
 }
 
-function irParaHomeInicial(){
+function irParaHomeInicial() {
   if ("scrollRestoration" in history) {
     history.scrollRestoration = "manual"
   }
@@ -710,10 +851,41 @@ function irParaHomeInicial(){
   window.scrollTo(0, 0)
 }
 
-window.addEventListener("load", irParaHomeInicial)
+function irParaBusca() {
+  if (!searchInput) {
+    window.location.href = "produtos/"
+    return
+  }
 
-carregarProdutos()
+  const termo = searchInput.value.trim()
+  const destino = termo
+    ? "produtos/?q=" + encodeURIComponent(termo)
+    : "produtos/"
+
+  window.location.href = destino
+}
+
+if (searchBtn) {
+  searchBtn.addEventListener("click", irParaBusca)
+}
+
+if (searchInput) {
+  searchInput.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault()
+      irParaBusca()
+    }
+  })
+}
+
+window.addEventListener("load", () => {
+  irParaHomeInicial()
+  carregarDestaques()
+  carregarMaisVendidos()
+})
+
 </script>
 
 </body>
 </html>
+

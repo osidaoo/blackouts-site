@@ -211,7 +211,28 @@ select option{color:#00152f;}
 .link-entrega a{color:#bdf5dc;}
 
 .footer{margin-top:50px;text-align:center;color:var(--muted);font-size:13px;}
-</style>
+.price-line{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  margin-bottom:6px;
+}
+.price-old{
+  text-decoration:line-through;
+  color:var(--muted);
+  font-size:13px;
+}
+.price-current{
+  font-weight:700;
+  color:#a8d2ff;
+}
+.btn:disabled,
+.btn[disabled]{
+  cursor:not-allowed;
+  opacity:.6;
+  box-shadow:none;
+  transform:none;
+}</style>
 </head>
 <body>
 <div class="page">
@@ -264,7 +285,7 @@ select option{color:#00152f;}
       <div id="linkEntrega" class="link-entrega"></div>
     </div>
 
-    <div class="footer">� Blackouts � loja digital com identidade premium</div>
+    <div class="footer">© Blackouts — loja digital com identidade premium</div>
   </div>
 </div>
 
@@ -282,20 +303,21 @@ const pixBox = document.getElementById("pixBox")
 const pixQrImage = document.getElementById("pixQrImage")
 const pixCode = document.getElementById("pixCode")
 const linkEntrega = document.getElementById("linkEntrega")
+const btnGerar = document.getElementById("btnGerar")
 
 let produtosCache = []
 
-function mostrarStatusPedido(texto, tipo){
+function mostrarStatusPedido(texto, tipo) {
   pedidoStatusEl.className = "status " + tipo
   pedidoStatusEl.textContent = texto
 }
 
-function limparStatusPedido(){
+function limparStatusPedido() {
   pedidoStatusEl.className = "status"
   pedidoStatusEl.textContent = ""
 }
 
-function resetPix(){
+function resetPix() {
   pixBox.style.display = "none"
   pixQrImage.src = ""
   pixCode.value = ""
@@ -303,41 +325,66 @@ function resetPix(){
   linkEntrega.innerHTML = ""
 }
 
-function formatarMoeda(valor){
+function formatarMoeda(valor) {
   return Number(valor || 0).toLocaleString("pt-BR", {
     style: "currency",
     currency: "BRL"
   })
 }
 
-function atualizarInfoProduto(produto){
+function obterPrecoFinal(produto) {
+  const preco = Number(produto.preco ?? produto.price ?? 0)
+  const promo = Number(produto.preco_promocional ?? 0)
+  if (promo && !Number.isNaN(promo) && promo > 0 && promo < preco) {
+    return { preco, promo, final: promo }
+  }
+  return { preco, promo: null, final: preco }
+}
+
+function atualizarInfoProduto(produto) {
+  limparStatusPedido()
+
   if (!produto) {
     productInfo.innerHTML = "<strong>Selecione um produto</strong><span>Escolha abaixo para continuar.</span>"
+    if (btnGerar) {
+      btnGerar.disabled = true
+    }
     return
   }
 
-  const estoque = produto.stock_available ?? produto.estoque ?? 0
+  const estoque = Number(produto.stock_available ?? produto.estoque ?? 0)
+  const ativo = produto.ativo !== undefined ? Boolean(produto.ativo) : true
+  const disponivel = ativo && estoque > 0
+  const { preco, promo, final } = obterPrecoFinal(produto)
 
   productInfo.innerHTML = `
-    <strong>${produto.name ?? produto.nome ?? "Produto"}</strong>
-    <span>${formatarMoeda(produto.price ?? produto.preco ?? 0)} � Estoque: ${estoque}</span>
+    <strong>${produto.nome ?? produto.name ?? "Produto"}</strong>
+    <div class="price-line">
+      ${promo ? `<span class="price-old">${formatarMoeda(preco)}</span>` : ""}
+      <span class="price-current">${formatarMoeda(final)}</span>
+    </div>
+    <span>${disponivel ? `Estoque: ${estoque}` : "Produto indisponível"}</span>
   `
+
+  if (btnGerar) {
+    btnGerar.disabled = !disponivel
+  }
 }
 
-async function carregarProdutos(){
-  try{
+async function carregarProdutos() {
+  try {
     const res = await fetch(API_URL + "/produtos")
     const produtos = await res.json()
     produtosCache = Array.isArray(produtos) ? produtos : []
 
     if (!produtosCache.length) {
-      produtoSelect.innerHTML = "<option value=''>Nenhum produto disponivel</option>"
+      produtoSelect.innerHTML = "<option value=''>Nenhum produto disponível</option>"
       atualizarInfoProduto(null)
       return
     }
 
     produtoSelect.innerHTML = produtosCache
-      .map((produto) => `<option value="${produto.id}">${produto.name ?? produto.nome ?? "Produto"}</option>`)
+      .map((produto) => `<option value="${produto.id}">${produto.nome ?? produto.name ?? "Produto"}</option>`)
       .join("")
 
     const url = new URL(window.location.href)
@@ -348,12 +395,13 @@ async function carregarProdutos(){
     }
 
     atualizarInfoProduto(produtosCache.find((p) => String(p.id) === String(produtoSelect.value)))
-  }catch(e){
+  } catch (error) {
     produtoSelect.innerHTML = "<option value=''>Erro ao carregar</option>"
+    atualizarInfoProduto(null)
   }
 }
 
-async function enviarPedido(){
+async function enviarPedido() {
   limparStatusPedido()
   resetPix()
 
@@ -361,19 +409,20 @@ async function enviarPedido(){
   const nome_cliente = nomeClienteEl.value.trim()
   const email_cliente = emailClienteEl.value.trim()
 
-  if(!produto_id || !nome_cliente || !email_cliente){
+  if (!produto_id || !nome_cliente || !email_cliente) {
     mostrarStatusPedido("Preencha produto, nome e email.", "error")
     return
   }
 
   const produto = produtosCache.find((p) => String(p.id) === String(produto_id))
-  const estoque = produto?.stock_available ?? produto?.estoque ?? 0
-  if (estoque <= 0) {
-    mostrarStatusPedido("Produto sem estoque disponivel.", "error")
+  const estoque = produto ? Number(produto.stock_available ?? 0) : 0
+  const ativo = produto?.ativo !== undefined ? Boolean(produto.ativo) : true
+  if (!ativo || estoque <= 0) {
+    mostrarStatusPedido("Produto indisponível no momento.", "error")
     return
   }
 
-  try{
+  try {
     const res = await fetch(API_URL + "/pedidos", {
       method: "POST",
       headers: {
@@ -388,15 +437,15 @@ async function enviarPedido(){
 
     const dados = await res.json()
 
-    if(!res.ok){
+    if (!res.ok) {
       mostrarStatusPedido(dados.erro || "Erro ao gerar pedido Pix.", "error")
       return
     }
 
-    mostrarStatusPedido("Pix gerado com sucesso. Fa�a o pagamento e acompanhe a entrega.", "ok")
+    mostrarStatusPedido("Pix gerado com sucesso. Faça o pagamento e acompanhe a entrega.", "ok")
 
-    if(dados.pix){
-      if(dados.pix.qr_code_base64){
+    if (dados.pix) {
+      if (dados.pix.qr_code_base64) {
         pixQrImage.src = "data:image/png;base64," + dados.pix.qr_code_base64
       }
 
@@ -404,31 +453,30 @@ async function enviarPedido(){
       pixBox.style.display = "block"
     }
 
-    if(dados.entrega_url){
+    if (dados.entrega_url) {
       linkEntrega.innerHTML = `
         <strong>Link de acompanhamento da entrega:</strong><br><br>
         <a href="${dados.entrega_url}" target="_blank">${dados.entrega_url}</a>
       `
       linkEntrega.style.display = "block"
     }
-
-  }catch(e){
+  } catch (error) {
     mostrarStatusPedido("Erro ao conectar com a API.", "error")
   }
 }
 
-async function copiarPix(){
+async function copiarPix() {
   const texto = pixCode.value
 
-  if(!texto){
+  if (!texto) {
     return
   }
 
-  try{
+  try {
     await navigator.clipboard.writeText(texto)
-    alert("Codigo Pix copiado.")
-  }catch(e){
-    alert("Nao foi possivel copiar o codigo.")
+    alert("Código Pix copiado.")
+  } catch (error) {
+    alert("Não foi possível copiar o código.")
   }
 }
 
@@ -441,6 +489,7 @@ document.getElementById("btnGerar").addEventListener("click", enviarPedido)
 document.getElementById("btnCopiar").addEventListener("click", copiarPix)
 
 carregarProdutos()
+
 </script>
 </body>
 </html>

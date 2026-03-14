@@ -156,7 +156,63 @@ body::before{
 @media (max-width: 900px){
   .nav{flex-direction:column;gap:12px;}
 }
-</style>
+.filters{
+  margin-top:20px;
+  display:flex;
+  gap:12px;
+  flex-wrap:wrap;
+  align-items:flex-end;
+  justify-content:center;
+}
+.filter-group{
+  min-width:220px;
+}
+.filters input{
+  margin-bottom:0;
+}
+.btn-ghost{
+  background:rgba(255,255,255,.06);
+  color:#dfe8ff;
+  border:1px solid rgba(255,255,255,.14);
+}
+.btn-ghost:hover{transform:translateY(-2px);box-shadow:var(--glow);}
+.product-desc{
+  color:var(--muted);
+  font-size:13px;
+  line-height:1.45;
+  margin-bottom:12px;
+  min-height:38px;
+}
+.price-line{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  margin-bottom:10px;
+}
+.price-old{
+  color:var(--muted);
+  font-size:13px;
+  text-decoration:line-through;
+}
+.price-current{
+  font-size:20px;
+  font-weight:700;
+  color:#a8d2ff;
+}
+.product-card.disabled{
+  opacity:.55;
+}
+.stock.soldout{
+  color:#ff9aa6;
+  font-weight:600;
+}
+.btn:disabled,
+.btn[disabled]{
+  cursor:not-allowed;
+  opacity:.6;
+  box-shadow:none;
+  transform:none;
+}</style>
 </head>
 <body>
 <div class="page">
@@ -174,12 +230,30 @@ body::before{
       <h1>Produtos</h1>
       <p>Escolha o produto e finalize a compra com Pix.</p>
 
-      <div id="produtos" class="products-grid">
+            <div class="filters">
+        <div class="filter-group">
+          <label for="categoriaFiltro">Categoria</label>
+          <select id="categoriaFiltro">
+            <option value="">Todas</option>
+            <option value="games">Games</option>
+            <option value="assinaturas">Assinaturas</option>
+            <option value="steam keys">Steam Keys</option>
+            <option value="ia">IA's</option>
+            <option value="outros">Outros</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label for="buscaFiltro">Buscar</label>
+          <input id="buscaFiltro" type="text" placeholder="Nome ou descricao" />
+        </div>
+        <button class="btn btn-ghost" id="limparFiltro">Limpar filtro</button>
+      </div>
+<div id="produtos" class="products-grid">
         <div>Carregando produtos...</div>
       </div>
     </section>
 
-    <div class="footer">� Blackouts � loja digital com identidade premium</div>
+    <div class="footer">© Blackouts — loja digital com identidade premium</div>
   </div>
 </div>
 
@@ -188,53 +262,179 @@ body::before{
 const CONFIG = window.__CONFIG__ || {}
 const API_URL = CONFIG.API_URL || "https://blackouts-site.onrender.com"
 
-function normalizeImageUrl(url){
+const produtosContainer = document.getElementById("produtos")
+const categoriaSelect = document.getElementById("categoriaFiltro")
+const buscaInput = document.getElementById("buscaFiltro")
+const limparFiltroBtn = document.getElementById("limparFiltro")
+let produtosCache = []
+
+function formatarMoeda(valor) {
+  return Number(valor || 0).toLocaleString("pt-BR", {
+    style: "currency",
+    currency: "BRL"
+  })
+}
+
+function normalizarImagem(url) {
   const raw = String(url || "").trim()
   if (!raw) return ""
   return raw.replace(/"/g, "&quot;")
 }
 
-async function carregarProdutos(){
-  const container = document.getElementById("produtos")
+function resumirTexto(texto, limite) {
+  const valor = String(texto || "").trim()
+  if (!valor) return "Entrega automática via Pix"
+  if (valor.length <= limite) return valor
+  return valor.slice(0, limite).trim() + "..."
+}
 
-  try{
-    const res = await fetch(API_URL + "/produtos")
-    const produtos = await res.json()
+function obterPrecoFinal(produto) {
+  const preco = Number(produto.preco ?? produto.price ?? 0)
+  const promo = Number(produto.preco_promocional ?? 0)
+  if (promo && !Number.isNaN(promo) && promo > 0 && promo < preco) {
+    return { preco, promo, final: promo }
+  }
+  return { preco, promo: null, final: preco }
+}
 
-    if(!produtos.length){
-      container.innerHTML = "Nenhum produto disponivel."
-      return
+function montarCardProduto(produto) {
+  const nome = produto.nome ?? produto.name ?? "Produto"
+  const descricao = resumirTexto(produto.descricao ?? produto.description, 100)
+  const estoque = Number(produto.stock_available ?? produto.estoque ?? 0)
+  const ativo = produto.ativo !== undefined ? Boolean(produto.ativo) : true
+  const imagem = normalizarImagem(produto.banner_url ?? produto.image_url ?? produto.image)
+  const letra = nome ? nome.charAt(0).toUpperCase() : "B"
+  const thumbStyle = imagem ? `style="background-image:url('${imagem}')"` : ""
+  const { preco, promo, final } = obterPrecoFinal(produto)
+  const indisponivel = !ativo || estoque <= 0
+
+  return `
+    <div class="product-card ${indisponivel ? "disabled" : ""}">
+      <div class="product-thumb" ${thumbStyle}>${imagem ? "" : letra}</div>
+      <h3>${nome}</h3>
+      <div class="product-desc">${descricao}</div>
+      <div class="price-line">
+        ${promo ? `<span class="price-old">${formatarMoeda(preco)}</span>` : ""}
+        <span class="price-current">${formatarMoeda(final)}</span>
+      </div>
+      <div class="stock ${indisponivel ? "soldout" : ""}">
+        ${indisponivel ? "Indisponível" : `Estoque: ${estoque}`}
+      </div>
+      ${indisponivel
+        ? '<button class="btn btn-ghost" disabled>Indisponível</button>'
+        : `<button class="btn btn-primary" onclick="irParaCheckout(${produto.id})">Comprar</button>`
+      }
+    </div>
+  `
+}
+
+function renderProdutos(lista) {
+  if (!Array.isArray(lista) || !lista.length) {
+    produtosContainer.innerHTML = "Nenhum produto encontrado."
+    return
+  }
+
+  produtosContainer.innerHTML = lista.map(montarCardProduto).join("")
+}
+
+function atualizarUrlFiltros() {
+  const url = new URL(window.location.href)
+  const categoria = categoriaSelect?.value || ""
+  const termo = buscaInput?.value?.trim() || ""
+
+  if (categoria) {
+    url.searchParams.set("categoria", categoria)
+  } else {
+    url.searchParams.delete("categoria")
+  }
+
+  if (termo) {
+    url.searchParams.set("q", termo)
+  } else {
+    url.searchParams.delete("q")
+  }
+
+  window.history.replaceState({}, "", url)
+}
+
+function aplicarFiltroTexto(lista, termo) {
+  const valor = String(termo || "").trim().toLowerCase()
+  if (!valor) return lista
+
+  return (lista || []).filter((produto) => {
+    const nome = String(produto?.nome ?? produto?.name ?? "").toLowerCase()
+    const descricao = String(produto?.descricao ?? produto?.description ?? "").toLowerCase()
+    return nome.includes(valor) || descricao.includes(valor)
+  })
+}
+
+function aplicarFiltrosLocais() {
+  const termo = buscaInput?.value || ""
+  const filtrados = aplicarFiltroTexto(produtosCache, termo)
+  renderProdutos(filtrados)
+}
+
+async function carregarProdutos() {
+  const categoria = categoriaSelect?.value || ""
+
+  try {
+    let url = API_URL + "/produtos"
+    if (categoria) {
+      url += "?categoria=" + encodeURIComponent(categoria)
     }
 
-    let html = ""
-
-    produtos.forEach(produto => {
-      const nome = produto.name ?? produto.nome ?? "-"
-      const preco = Number(produto.price ?? produto.preco ?? 0)
-      const estoque = produto.stock_available ?? produto.estoque ?? "-"
-      const imagem = normalizeImageUrl(produto.image_url ?? produto.image ?? "")
-      const letra = nome ? nome.charAt(0).toUpperCase() : "B"
-      const thumbStyle = imagem ? `style="background-image:url('${imagem}')"` : ""
-
-      html += `
-        <div class="product-card">
-          <div class="product-thumb" ${thumbStyle}>${imagem ? "" : letra}</div>
-          <h3>${nome}</h3>
-          <div class="price">R$ ${preco.toFixed(2)}</div>
-          <div class="product-meta">Entrega automatica via Pix</div>
-          <div class="stock">Estoque: ${estoque}</div>
-          <a class="btn btn-primary" href="../checkout/?produto=${produto.id}">Comprar</a>
-        </div>
-      `
-    })
-
-    container.innerHTML = html
-  }catch(e){
-    container.innerHTML = "Erro ao carregar produtos"
+    const res = await fetch(url)
+    const produtos = await res.json()
+    produtosCache = Array.isArray(produtos) ? produtos : []
+    aplicarFiltrosLocais()
+  } catch (error) {
+    produtosContainer.innerHTML = "Erro ao carregar produtos"
   }
 }
 
+function irParaCheckout(produtoId) {
+  window.location.href = "../checkout/?produto=" + encodeURIComponent(produtoId)
+}
+
+if (categoriaSelect) {
+  const params = new URLSearchParams(window.location.search)
+  const categoriaParam = params.get("categoria")
+  const buscaParam = params.get("q")
+  if (categoriaParam) {
+    categoriaSelect.value = categoriaParam
+  }
+  if (buscaParam && buscaInput) {
+    buscaInput.value = buscaParam
+  }
+
+  categoriaSelect.addEventListener("change", () => {
+    atualizarUrlFiltros()
+    carregarProdutos()
+  })
+}
+
+if (buscaInput) {
+  buscaInput.addEventListener("input", () => {
+    atualizarUrlFiltros()
+    aplicarFiltrosLocais()
+  })
+}
+
+if (limparFiltroBtn) {
+  limparFiltroBtn.addEventListener("click", () => {
+    if (categoriaSelect) {
+      categoriaSelect.value = ""
+    }
+    if (buscaInput) {
+      buscaInput.value = ""
+    }
+    atualizarUrlFiltros()
+    carregarProdutos()
+  })
+}
+
 carregarProdutos()
+
 </script>
 </body>
 </html>

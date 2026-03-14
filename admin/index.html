@@ -347,6 +347,78 @@
       font-weight:900;
       color:var(--primary2);
     }
+  
+    textarea{
+      width:100%;
+      min-height:120px;
+      padding:14px 16px;
+      border-radius:14px;
+      border:1px solid rgba(255,255,255,.12);
+      background:rgba(255,255,255,.04);
+      color:#fff;
+      outline:none;
+      margin-bottom:14px;
+      font-size:15px;
+      resize:vertical;
+    }
+
+    .field-row{
+      display:flex;
+      gap:12px;
+      flex-wrap:wrap;
+    }
+
+    .field-row > div{
+      flex:1;
+      min-width:220px;
+    }
+
+    .toggle-row{
+      display:flex;
+      gap:18px;
+      flex-wrap:wrap;
+      align-items:center;
+      margin-bottom:10px;
+    }
+
+    .toggle{
+      display:flex;
+      align-items:center;
+      gap:8px;
+      font-size:14px;
+      color:var(--muted);
+    }
+
+    .toggle input{
+      width:auto;
+      margin:0;
+    }
+
+    .banner-preview{
+      width:100%;
+      min-height:140px;
+      border-radius:16px;
+      background:rgba(255,255,255,.04);
+      border:1px dashed rgba(255,255,255,.2);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      color:var(--muted);
+      font-size:13px;
+      margin-bottom:16px;
+      background-size:cover;
+      background-position:center;
+    }
+
+    .banner-preview.has-image{
+      border-style:solid;
+      color:transparent;
+    }
+
+    .btn.small{
+      padding:8px 12px;
+      font-size:12px;
+    }
   </style>
 </head>
 <body>
@@ -415,14 +487,82 @@
 
           <input id="produtoId" type="hidden" />
 
-          <label for="nomeProduto">Nome do produto</label>
-          <input id="nomeProduto" type="text" placeholder="Ex: Conta Premium" />
+          <div class="field-row">
+            <div>
+              <label for="nomeProduto">Nome do produto</label>
+              <input id="nomeProduto" type="text" placeholder="Ex: Conta Premium" />
+            </div>
+            <div>
+              <label for="slugProduto">Slug</label>
+              <input id="slugProduto" type="text" placeholder="ex: conta-premium" />
+            </div>
+          </div>
 
-          <label for="precoProduto">Preço</label>
-          <input id="precoProduto" type="number" step="0.01" placeholder="Ex: 29.90" />
+          <div class="field-row">
+            <div>
+              <label for="categoriaProduto">Categoria</label>
+              <select id="categoriaProduto">
+                <option value="games">Games</option>
+                <option value="assinaturas">Assinaturas</option>
+                <option value="steam keys">Steam Keys</option>
+                <option value="ia">IA</option>
+                <option value="outros">Outros</option>
+              </select>
+            </div>
+            <div>
+              <label for="quantidadeProduto">Quantidade</label>
+              <input id="quantidadeProduto" type="number" min="0" step="1" placeholder="Ex: 10" />
+            </div>
+          </div>
 
-          <label for="produtoEstoque">Estoque disponivel</label>
-          <input id="produtoEstoque" type="number" placeholder="Calculado automaticamente" disabled />
+          <label for="descricaoProduto">Descrição</label>
+          <textarea id="descricaoProduto" placeholder="Descreva o produto"></textarea>
+
+          <div class="field-row">
+            <div>
+              <label for="precoProduto">Preço</label>
+              <input id="precoProduto" type="number" step="0.01" placeholder="Ex: 29.90" />
+            </div>
+            <div>
+              <label for="precoPromocionalProduto">Preço promocional</label>
+              <input id="precoPromocionalProduto" type="number" step="0.01" placeholder="Opcional" />
+            </div>
+          </div>
+
+          <div class="field-row">
+            <div>
+              <label for="bannerUrlProduto">Banner URL</label>
+              <input id="bannerUrlProduto" type="text" placeholder="https://..." />
+            </div>
+            <div>
+              <label for="bannerFileProduto">Upload de banner</label>
+              <input id="bannerFileProduto" type="file" accept="image/*" />
+            </div>
+          </div>
+
+          <div id="bannerPreview" class="banner-preview">Prévia do banner</div>
+
+          <div class="toggle-row">
+            <div class="toggle">
+              <input id="ativoProduto" type="checkbox" checked />
+              <label for="ativoProduto">Produto ativo</label>
+            </div>
+            <div class="toggle">
+              <input id="destaqueProduto" type="checkbox" />
+              <label for="destaqueProduto">Destaque na vitrine</label>
+            </div>
+          </div>
+
+          <div class="field-row">
+            <div>
+              <label for="totalVendasProduto">Total de vendas</label>
+              <input id="totalVendasProduto" type="number" disabled />
+            </div>
+            <div>
+              <label for="produtoEstoque">Estoque disponivel</label>
+              <input id="produtoEstoque" type="number" placeholder="Calculado automaticamente" disabled />
+            </div>
+          </div>
 
           <div class="btn-row">
             <button id="btnSalvarProduto" class="btn btn-primary">Salvar produto</button>
@@ -544,855 +684,1091 @@
   <script src="../config.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
-    const CONFIG = window.__CONFIG__ || {}
-    const API_URL = CONFIG.API_URL || "https://blackouts-site.onrender.com"
-    const SUPABASE_URL = CONFIG.SUPABASE_URL || ""
-    const SUPABASE_ANON_KEY = CONFIG.SUPABASE_ANON_KEY || ""
-    const supabaseClient = window.supabase?.createClient
-      ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-        auth: {
-          persistSession: true,
-          autoRefreshToken: true,
-          detectSessionInUrl: true
-        }
-      })
-      : null
+const CONFIG = window.__CONFIG__ || {}
+const API_URL = CONFIG.API_URL || "https://blackouts-site.onrender.com"
+const SUPABASE_URL = CONFIG.SUPABASE_URL || ""
+const SUPABASE_ANON_KEY = CONFIG.SUPABASE_ANON_KEY || ""
+const BANNER_BUCKET = "product-banners"
 
-    const loginCard = document.getElementById("loginCard")
-    const adminArea = document.getElementById("adminArea")
-    const btnLogin = document.getElementById("btnLogin")
-    const btnLogoutTop = document.getElementById("btnLogoutTop")
-    const btnSalvarProduto = document.getElementById("btnSalvarProduto")
-    const btnCancelarEdicao = document.getElementById("btnCancelarEdicao")
-    const btnAtualizar = document.getElementById("btnAtualizar")
-    const btnAtualizarPedidos = document.getElementById("btnAtualizarPedidos")
-    const btnAtualizarDashboard = document.getElementById("btnAtualizarDashboard")
-    const btnAtualizarEstoque = document.getElementById("btnAtualizarEstoque")
-    const btnSalvarEstoque = document.getElementById("btnSalvarEstoque")
-    const btnCancelarEstoque = document.getElementById("btnCancelarEstoque")
-    const btnLimparFiltroEstoque = document.getElementById("btnLimparFiltroEstoque")
+const supabaseClient = window.supabase?.createClient
+  ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true
+      }
+    })
+  : null
 
-    const loginStatus = document.getElementById("loginStatus")
-    const produtoStatus = document.getElementById("produtoStatus")
-    const produtosWrap = document.getElementById("produtosWrap")
-    const pedidosWrap = document.getElementById("pedidosWrap")
-    const estoqueWrap = document.getElementById("estoqueWrap")
-    const welcomeText = document.getElementById("welcomeText")
-    const totalProdutosPill = document.getElementById("totalProdutosPill")
-    const estoqueTotalPill = document.getElementById("estoqueTotalPill")
-    const totalPedidosPill = document.getElementById("totalPedidosPill")
-    const formTitle = document.getElementById("formTitle")
-    const estoqueFormTitle = document.getElementById("estoqueFormTitle")
+const loginCard = document.getElementById("loginCard")
+const adminArea = document.getElementById("adminArea")
+const btnLogin = document.getElementById("btnLogin")
+const btnLogoutTop = document.getElementById("btnLogoutTop")
+const btnSalvarProduto = document.getElementById("btnSalvarProduto")
+const btnCancelarEdicao = document.getElementById("btnCancelarEdicao")
+const btnAtualizar = document.getElementById("btnAtualizar")
+const btnAtualizarPedidos = document.getElementById("btnAtualizarPedidos")
+const btnAtualizarDashboard = document.getElementById("btnAtualizarDashboard")
+const btnAtualizarEstoque = document.getElementById("btnAtualizarEstoque")
+const btnSalvarEstoque = document.getElementById("btnSalvarEstoque")
+const btnCancelarEstoque = document.getElementById("btnCancelarEstoque")
+const btnLimparFiltroEstoque = document.getElementById("btnLimparFiltroEstoque")
 
-    const statPedidosTotais = document.getElementById("statPedidosTotais")
-    const statFaturamentoTotal = document.getElementById("statFaturamentoTotal")
-    const statPedidosHoje = document.getElementById("statPedidosHoje")
-    const statFaturamentoHoje = document.getElementById("statFaturamentoHoje")
-    const statProdutosTotais = document.getElementById("statProdutosTotais")
-    const statEstoqueTotal = document.getElementById("statEstoqueTotal")
+const loginStatus = document.getElementById("loginStatus")
+const produtoStatus = document.getElementById("produtoStatus")
+const produtosWrap = document.getElementById("produtosWrap")
+const pedidosWrap = document.getElementById("pedidosWrap")
+const estoqueWrap = document.getElementById("estoqueWrap")
+const welcomeText = document.getElementById("welcomeText")
+const totalProdutosPill = document.getElementById("totalProdutosPill")
+const estoqueTotalPill = document.getElementById("estoqueTotalPill")
+const totalPedidosPill = document.getElementById("totalPedidosPill")
+const formTitle = document.getElementById("formTitle")
+const estoqueFormTitle = document.getElementById("estoqueFormTitle")
 
-    const emailInput = document.getElementById("email")
-    const senhaInput = document.getElementById("senha")
+const statPedidosTotais = document.getElementById("statPedidosTotais")
+const statFaturamentoTotal = document.getElementById("statFaturamentoTotal")
+const statPedidosHoje = document.getElementById("statPedidosHoje")
+const statFaturamentoHoje = document.getElementById("statFaturamentoHoje")
+const statProdutosTotais = document.getElementById("statProdutosTotais")
+const statEstoqueTotal = document.getElementById("statEstoqueTotal")
 
-    const produtoIdInput = document.getElementById("produtoId")
-    const nomeProdutoInput = document.getElementById("nomeProduto")
-    const precoProdutoInput = document.getElementById("precoProduto")
-    const produtoEstoqueInput = document.getElementById("produtoEstoque")
+const emailInput = document.getElementById("email")
+const senhaInput = document.getElementById("senha")
 
-    const estoqueIdInput = document.getElementById("estoqueId")
-    const estoqueProdutoSelect = document.getElementById("estoqueProdutoSelect")
-    const estoqueFiltroProduto = document.getElementById("estoqueFiltroProduto")
-    const estoqueLoginInput = document.getElementById("estoqueLogin")
-    const estoqueSenhaInput = document.getElementById("estoqueSenha")
-    const estoqueExtraInput = document.getElementById("estoqueExtra")
-    const estoqueStatusSelect = document.getElementById("estoqueStatusSelect")
-    const estoqueStatusMsg = document.getElementById("estoqueStatusMsg")
+const produtoIdInput = document.getElementById("produtoId")
+const nomeProdutoInput = document.getElementById("nomeProduto")
+const slugProdutoInput = document.getElementById("slugProduto")
+const categoriaProdutoSelect = document.getElementById("categoriaProduto")
+const descricaoProdutoInput = document.getElementById("descricaoProduto")
+const precoProdutoInput = document.getElementById("precoProduto")
+const precoPromocionalInput = document.getElementById("precoPromocionalProduto")
+const quantidadeProdutoInput = document.getElementById("quantidadeProduto")
+const bannerUrlInput = document.getElementById("bannerUrlProduto")
+const bannerFileInput = document.getElementById("bannerFileProduto")
+const bannerPreview = document.getElementById("bannerPreview")
+const ativoProdutoInput = document.getElementById("ativoProduto")
+const destaqueProdutoInput = document.getElementById("destaqueProduto")
+const totalVendasInput = document.getElementById("totalVendasProduto")
+const produtoEstoqueInput = document.getElementById("produtoEstoque")
 
-    let produtosCache = []
-    let sessionCache = null
-    let usuarioResumo = null
+const estoqueIdInput = document.getElementById("estoqueId")
+const estoqueProdutoSelect = document.getElementById("estoqueProdutoSelect")
+const estoqueFiltroProduto = document.getElementById("estoqueFiltroProduto")
+const estoqueLoginInput = document.getElementById("estoqueLogin")
+const estoqueSenhaInput = document.getElementById("estoqueSenha")
+const estoqueExtraInput = document.getElementById("estoqueExtra")
+const estoqueStatusSelect = document.getElementById("estoqueStatusSelect")
+const estoqueStatusMsg = document.getElementById("estoqueStatusMsg")
 
-    function mostrarStatus(el, texto, tipo) {
-      el.className = "status " + tipo
-      el.textContent = texto
+let produtosCache = []
+let sessionCache = null
+let usuarioResumo = null
+
+function mostrarStatus(el, texto, tipo) {
+  if (!el) return
+  el.className = "status " + tipo
+  el.textContent = texto
+}
+
+function limparStatus(el) {
+  if (!el) return
+  el.className = "status"
+  el.textContent = ""
+}
+
+function formatarMoeda(valor) {
+  return Number(valor || 0).toLocaleString("pt-BR", {
+    style: "currency",
+    currency: "BRL"
+  })
+}
+
+function gerarSlug(texto) {
+  return String(texto || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .toLowerCase()
+}
+
+function atualizarPreviewBanner(url) {
+  if (!bannerPreview) return
+  const link = String(url || "").trim()
+
+  if (!link) {
+    bannerPreview.classList.remove("has-image")
+    bannerPreview.style.backgroundImage = ""
+    bannerPreview.textContent = "Prévia do banner"
+    return
+  }
+
+  bannerPreview.classList.add("has-image")
+  bannerPreview.style.backgroundImage = `url('${link}')`
+  bannerPreview.textContent = ""
+}
+
+async function uploadBannerSeNecessario(slugAtual) {
+  const arquivo = bannerFileInput?.files?.[0]
+  const urlExistente = bannerUrlInput?.value?.trim() || ""
+
+  if (!arquivo) {
+    return urlExistente || null
+  }
+
+  if (!supabaseClient || !SUPABASE_URL || !SUPABASE_ANON_KEY) {
+    throw new Error("Supabase não configurado para upload")
+  }
+
+  const { data } = await supabaseClient.auth.getSession()
+  if (!data?.session) {
+    throw new Error("Sessão expirada. Faça login novamente.")
+  }
+
+  const extensao = arquivo.name.split(".").pop() || "png"
+  const slugSeguro = slugAtual ? gerarSlug(slugAtual) : "produto"
+  const nomeArquivo = `${slugSeguro}-${Date.now()}.${extensao}`
+  const caminho = `banners/${nomeArquivo}`
+
+  const { error } = await supabaseClient.storage
+    .from(BANNER_BUCKET)
+    .upload(caminho, arquivo, {
+      upsert: true,
+      contentType: arquivo.type
+    })
+
+  if (error) {
+    throw new Error(error.message || "Falha ao enviar banner")
+  }
+
+  const { data: publicData } = supabaseClient.storage
+    .from(BANNER_BUCKET)
+    .getPublicUrl(caminho)
+
+  return publicData?.publicUrl || null
+}
+
+async function obterPerfilUsuario(usuario) {
+  if (!supabaseClient || !usuario?.id) {
+    return null
+  }
+
+  try {
+    const { data, error } = await supabaseClient
+      .from("profiles")
+      .select("role, name, nome")
+      .eq("id", usuario.id)
+      .maybeSingle()
+
+    if (error) {
+      return null
     }
 
-    function limparStatus(el) {
-      el.className = "status"
-      el.textContent = ""
+    return data || null
+  } catch (error) {
+    return null
+  }
+}
+
+function obterRoleUsuario(usuario, perfil) {
+  return String(
+    perfil?.role ||
+    usuario?.user_metadata?.role ||
+    usuario?.app_metadata?.role ||
+    ""
+  ).toLowerCase()
+}
+
+function ehAdmin(papel) {
+  const valor = String(papel || "").toLowerCase()
+  return valor === "admin" || valor === "administrador"
+}
+
+function montarResumoUsuario(usuario, perfil) {
+  if (!usuario) {
+    return null
+  }
+
+  const papel = obterRoleUsuario(usuario, perfil) || "administrador"
+  const nome =
+    perfil?.name ||
+    perfil?.nome ||
+    usuario.user_metadata?.name ||
+    usuario.user_metadata?.nome ||
+    (usuario.email ? usuario.email.split("@")[0] : "Administrador")
+
+  return {
+    nome,
+    email: usuario.email || "-",
+    papel
+  }
+}
+
+function getToken() {
+  return sessionCache?.access_token || ""
+}
+
+async function carregarSessao() {
+  if (!supabaseClient) {
+    return null
+  }
+
+  const { data } = await supabaseClient.auth.getSession()
+  sessionCache = data?.session || null
+  return sessionCache
+}
+
+async function sairSessao() {
+  sessionCache = null
+  usuarioResumo = null
+  if (supabaseClient) {
+    await supabaseClient.auth.signOut()
+  }
+}
+
+function mostrarTelaAdmin() {
+  const usuario = usuarioResumo
+  loginCard.classList.add("hidden")
+  adminArea.classList.remove("hidden")
+  btnLogoutTop.classList.remove("hidden")
+
+  welcomeText.innerHTML =
+    "Logado como: <strong>" + (usuario?.nome || "Administrador") + "</strong><br>" +
+    "E-mail: <strong>" + (usuario?.email || "-") + "</strong><br>" +
+    "Papel: <strong>" + (usuario?.papel || "administrador") + "</strong>"
+}
+
+function mostrarTelaLogin() {
+  adminArea.classList.add("hidden")
+  loginCard.classList.remove("hidden")
+  btnLogoutTop.classList.add("hidden")
+  welcomeText.textContent = "Você ainda não está logado."
+}
+
+function limparFormularioProduto() {
+  produtoIdInput.value = ""
+  nomeProdutoInput.value = ""
+  slugProdutoInput.value = ""
+  categoriaProdutoSelect.value = "games"
+  descricaoProdutoInput.value = ""
+  precoProdutoInput.value = ""
+  precoPromocionalInput.value = ""
+  quantidadeProdutoInput.value = ""
+  bannerUrlInput.value = ""
+  if (bannerFileInput) {
+    bannerFileInput.value = ""
+  }
+  ativoProdutoInput.checked = true
+  destaqueProdutoInput.checked = false
+  totalVendasInput.value = ""
+  produtoEstoqueInput.value = ""
+  atualizarPreviewBanner("")
+  formTitle.textContent = "Cadastrar produto"
+}
+
+function limparFormularioEstoque() {
+  estoqueIdInput.value = ""
+  estoqueLoginInput.value = ""
+  estoqueSenhaInput.value = ""
+  estoqueExtraInput.value = ""
+  estoqueStatusSelect.value = "available"
+  estoqueFormTitle.textContent = "Adicionar item de estoque"
+}
+function atualizarResumoProdutos(produtos) {
+  const totalProdutos = produtos.length
+  const estoqueTotal = produtos.reduce(
+    (total, item) => total + Number(item.stock_available ?? item.quantidade ?? item.estoque ?? 0),
+    0
+  )
+
+  totalProdutosPill.textContent = "Produtos: " + totalProdutos
+  estoqueTotalPill.textContent = "Estoque disponível: " + estoqueTotal
+}
+
+function atualizarResumoPedidos(pedidos) {
+  totalPedidosPill.textContent = "Pedidos: " + (pedidos?.length || 0)
+}
+
+function popularSelectProdutos(produtos) {
+  produtosCache = Array.isArray(produtos) ? produtos : []
+
+  if (!estoqueProdutoSelect) {
+    return
+  }
+
+  if (!produtosCache.length) {
+    estoqueProdutoSelect.innerHTML = '<option value="">Nenhum produto</option>'
+    if (estoqueFiltroProduto) {
+      estoqueFiltroProduto.innerHTML = '<option value="">Todos os produtos</option>'
+    }
+    return
+  }
+
+  let optionsCadastro = '<option value="">Selecione um produto</option>'
+  let optionsFiltro = '<option value="">Todos os produtos</option>'
+
+  for (const produto of produtosCache) {
+    const nome = produto.nome ?? produto.name ?? "Produto"
+    optionsCadastro += `<option value="${produto.id}">${nome}</option>`
+    optionsFiltro += `<option value="${produto.id}">${nome}</option>`
+  }
+
+  estoqueProdutoSelect.innerHTML = optionsCadastro
+  if (estoqueFiltroProduto) {
+    const valorAtual = estoqueFiltroProduto.value
+    estoqueFiltroProduto.innerHTML = optionsFiltro
+    if (valorAtual) {
+      estoqueFiltroProduto.value = valorAtual
+    }
+  }
+}
+
+async function lerRespostaSegura(resposta) {
+  const texto = await resposta.text()
+
+  try {
+    return texto ? JSON.parse(texto) : {}
+  } catch {
+    return { erro: texto || "Resposta inválida da API" }
+  }
+}
+
+async function login() {
+  limparStatus(loginStatus)
+
+  const email = emailInput.value.trim()
+  const senha = senhaInput.value.trim()
+
+  if (!email || !senha) {
+    mostrarStatus(loginStatus, "Preencha email e senha.", "error")
+    return
+  }
+
+  if (!supabaseClient || !SUPABASE_URL || !SUPABASE_ANON_KEY) {
+    mostrarStatus(loginStatus, "Configure o Supabase em config.js.", "error")
+    return
+  }
+
+  try {
+    const { data, error } = await supabaseClient.auth.signInWithPassword({
+      email,
+      password: senha
+    })
+
+    if (error) {
+      mostrarStatus(loginStatus, error.message || "Erro no login.", "error")
+      return
     }
 
-    function obterRoleUsuario(usuario) {
-      return String(
-        usuario?.user_metadata?.role ||
-        usuario?.app_metadata?.role ||
-        ""
-      ).toLowerCase()
+    sessionCache = data?.session || null
+    const perfil = await obterPerfilUsuario(data?.user)
+    usuarioResumo = montarResumoUsuario(data?.user, perfil)
+
+    if (!ehAdmin(usuarioResumo?.papel)) {
+      await sairSessao()
+      mostrarStatus(loginStatus, "Esse usuário não é administrador.", "error")
+      return
     }
 
-    function ehAdmin(papel) {
-      const valor = String(papel || "").toLowerCase()
-      return valor === "admin" || valor === "administrador"
-    }
-
-    function montarResumoUsuario(usuario) {
-      if (!usuario) {
-        return null
-      }
-
-      const papel = obterRoleUsuario(usuario) || "administrador"
-      const nome =
-        usuario.user_metadata?.name ||
-        usuario.user_metadata?.nome ||
-        (usuario.email ? usuario.email.split("@")[0] : "Administrador")
-
-      return {
-        nome,
-        email: usuario.email || "-",
-        papel
-      }
-    }
-
-    function getToken() {
-      return sessionCache?.access_token || ""
-    }
-
-    async function carregarSessao() {
-      if (!supabaseClient) {
-        return null
-      }
-
-      const { data } = await supabaseClient.auth.getSession()
-      sessionCache = data?.session || null
-      usuarioResumo = montarResumoUsuario(sessionCache?.user)
-      return sessionCache
-    }
-
-    async function sairSessao() {
-      sessionCache = null
-      usuarioResumo = null
-      if (supabaseClient) {
-        await supabaseClient.auth.signOut()
-      }
-    }
-
-    function formatarMoeda(valor) {
-      return Number(valor || 0).toLocaleString("pt-BR", {
-        style: "currency",
-        currency: "BRL"
-      })
-    }
-
-    function mostrarTelaAdmin() {
-      const usuario = usuarioResumo
-      loginCard.classList.add("hidden")
-      adminArea.classList.remove("hidden")
-      btnLogoutTop.classList.remove("hidden")
-
-      welcomeText.innerHTML =
-        "Logado como: <strong>" + (usuario?.nome || "Administrador") + "</strong><br>" +
-        "E-mail: <strong>" + (usuario?.email || "-") + "</strong><br>" +
-        "Papel: <strong>" + (usuario?.papel || "administrador") + "</strong>"
-    }
-
-    function mostrarTelaLogin() {
-      adminArea.classList.add("hidden")
-      loginCard.classList.remove("hidden")
-      btnLogoutTop.classList.add("hidden")
-      welcomeText.textContent = "Você ainda não está logado."
-    }
-
-    function limparFormularioProduto() {
-      produtoIdInput.value = ""
-      nomeProdutoInput.value = ""
-      precoProdutoInput.value = ""
-      produtoEstoqueInput.value = ""
-      formTitle.textContent = "Cadastrar produto"
-    }
-
-    function limparFormularioEstoque() {
-      estoqueIdInput.value = ""
-      estoqueLoginInput.value = ""
-      estoqueSenhaInput.value = ""
-      estoqueExtraInput.value = ""
-      estoqueStatusSelect.value = "available"
-      estoqueFormTitle.textContent = "Adicionar item de estoque"
-    }
-
-    function popularSelectProdutos(produtos) {
-      produtosCache = Array.isArray(produtos) ? produtos : []
-
-      if (!estoqueProdutoSelect) {
-        return
-      }
-
-      if (!produtosCache.length) {
-        estoqueProdutoSelect.innerHTML = '<option value="">Nenhum produto</option>'
-        if (estoqueFiltroProduto) {
-          estoqueFiltroProduto.innerHTML = '<option value="">Todos os produtos</option>'
-        }
-        return
-      }
-
-      let optionsCadastro = '<option value="">Selecione um produto</option>'
-      let optionsFiltro = '<option value="">Todos os produtos</option>'
-
-      for (const produto of produtosCache) {
-        const nome = produto.name ?? produto.nome ?? "Produto"
-        optionsCadastro += `<option value="${produto.id}">${nome}</option>`
-        optionsFiltro += `<option value="${produto.id}">${nome}</option>`
-      }
-
-      estoqueProdutoSelect.innerHTML = optionsCadastro
-      if (estoqueFiltroProduto) {
-        const valorAtual = estoqueFiltroProduto.value
-        estoqueFiltroProduto.innerHTML = optionsFiltro
-        if (valorAtual) {
-          estoqueFiltroProduto.value = valorAtual
-        }
-      }
-    }
-
-    async function lerRespostaSegura(resposta) {
-      const texto = await resposta.text()
-
-      try {
-        return texto ? JSON.parse(texto) : {}
-      } catch {
-        return { erro: texto || "Resposta inválida da API" }
-      }
-    }
-    async function login() {
-      limparStatus(loginStatus)
-
-      const email = emailInput.value.trim()
-      const senha = senhaInput.value.trim()
-
-      if (!email || !senha) {
-        mostrarStatus(loginStatus, "Preencha email e senha.", "error")
-        return
-      }
-
-      if (!supabaseClient || !SUPABASE_URL || !SUPABASE_ANON_KEY) {
-        mostrarStatus(loginStatus, "Configure o Supabase em config.js.", "error")
-        return
-      }
-
-      try {
-        const { data, error } = await supabaseClient.auth.signInWithPassword({
-          email,
-          password: senha
-        })
-
-        if (error) {
-          mostrarStatus(loginStatus, error.message || "Erro no login.", "error")
-          return
-        }
-
-        sessionCache = data?.session || null
-        usuarioResumo = montarResumoUsuario(data?.user)
-
-        if (!ehAdmin(usuarioResumo?.papel)) {
-          await sairSessao()
-          mostrarStatus(loginStatus, "Esse usuario nao e administrador.", "error")
-          return
-        }
-
-        mostrarStatus(loginStatus, "Login realizado com sucesso.", "ok")
-
-        mostrarTelaAdmin()
-        carregarDashboard()
-        carregarProdutos()
-        carregarPedidos()
-        carregarEstoque()
-      } catch (error) {
-        mostrarStatus(loginStatus, "Falha ao conectar com a API.", "error")
-      }
-    }
-
-    async function verificarSessao() {
-      if (!supabaseClient || !SUPABASE_URL || !SUPABASE_ANON_KEY) {
-        mostrarTelaLogin()
-        mostrarStatus(loginStatus, "Configure o Supabase em config.js.", "warn")
-        return
-      }
-
-      const sessao = await carregarSessao()
-
-      if (!sessao) {
-        mostrarTelaLogin()
-        return
-      }
-
-      try {
-        const { data, error } = await supabaseClient.auth.getUser()
-        const usuario = data?.user || sessao.user
-
-        if (error || !usuario) {
-          await sairSessao()
-          mostrarTelaLogin()
-          return
-        }
-
-        usuarioResumo = montarResumoUsuario(usuario)
-
-        if (!ehAdmin(usuarioResumo?.papel)) {
-          await sairSessao()
-          mostrarTelaLogin()
-          return
-        }
-
-        mostrarTelaAdmin()
-        carregarDashboard()
-        carregarProdutos()
-        carregarPedidos()
-        carregarEstoque()
-      } catch (error) {
-        await sairSessao()
-        mostrarTelaLogin()
-      }
-    }async function carregarDashboard() {
-      try {
-        const resposta = await fetch(API_URL + "/admin/dashboard", {
-          headers: {
-            Authorization: "Bearer " + getToken()
-          }
-        })
-
-        const dados = await lerRespostaSegura(resposta)
-
-        if (!resposta.ok) {
-          return
-        }
-
-        statPedidosTotais.textContent = dados.pedidos_totais ?? 0
-        statFaturamentoTotal.textContent = formatarMoeda(dados.faturamento_total ?? 0)
-        statPedidosHoje.textContent = dados.pedidos_hoje ?? 0
-        statFaturamentoHoje.textContent = formatarMoeda(dados.faturamento_hoje ?? 0)
-        statProdutosTotais.textContent = dados.produtos_totais ?? 0
-        statEstoqueTotal.textContent = dados.estoque_disponivel ?? dados.estoque_total ?? 0
-      } catch (error) {}
-    }
-
-    function atualizarResumoProdutos(produtos) {
-      const totalProdutos = produtos.length
-      const estoqueTotal = produtos.reduce(
-        (total, item) => total + Number(item.stock_available ?? item.estoque ?? 0),
-        0
-      )
-
-      totalProdutosPill.textContent = "Produtos: " + totalProdutos
-      estoqueTotalPill.textContent = "Estoque disponivel: " + estoqueTotal
-    }
-
-    function atualizarResumoPedidos(pedidos) {
-      totalPedidosPill.textContent = "Pedidos: " + pedidos.length
-    }
-
-    async function carregarProdutos() {
-      produtosWrap.innerHTML = '<div class="empty">Carregando produtos...</div>'
-
-      try {
-        const resposta = await fetch(API_URL + "/admin/produtos", {
-          headers: {
-            Authorization: "Bearer " + getToken()
-          }
-        })
-
-        const dados = await lerRespostaSegura(resposta)
-
-        if (!resposta.ok) {
-          produtosWrap.innerHTML = '<div class="empty">' + (dados.erro || "Erro ao carregar produtos.") + '</div>'
-          return
-        }
-
-        if (!Array.isArray(dados) || !dados.length) {
-          atualizarResumoProdutos([])
-          popularSelectProdutos([])
-          produtosWrap.innerHTML = '<div class="empty">Nenhum produto cadastrado ainda.</div>'
-          return
-        }
-
-        atualizarResumoProdutos(dados)
-        popularSelectProdutos(dados)
-
-        let html = `
-          <table>
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Nome</th>
-                <th>Preço</th>
-                <th>Estoque</th>
-                <th>Ações</th>
-              </tr>
-            </thead>
-            <tbody>
-        `
-
-        for (const produto of dados) {
-          const produtoJson = encodeURIComponent(JSON.stringify(produto))
-          const estoqueNumero = Number(produto.stock_available ?? produto.estoque ?? 0)
-          const nomeProduto = produto.name ?? produto.nome ?? ""
-          const precoProduto = produto.price ?? produto.preco ?? 0
-          const classeEstoque = estoqueNumero <= 3 ? "stock-low" : "stock-ok"
-
-          html += `
-            <tr>
-              <td>${produto.id}</td>
-              <td>${nomeProduto}</td>
-              <td>${formatarMoeda(precoProduto)}</td>
-              <td class="${classeEstoque}">${estoqueNumero}</td>
-              <td>
-                <div class="produto-actions">
-                  <button class="btn btn-secondary small" onclick="editarProduto('${produtoJson}')">Editar</button>
-                  <button class="btn btn-danger small" onclick="deletarProduto(${produto.id})">Excluir</button>
-                </div>
-              </td>
-            </tr>
-          `
-        }
-
-        html += `
-            </tbody>
-          </table>
-        `
-
-        produtosWrap.innerHTML = html
-      } catch (error) {
-        produtosWrap.innerHTML = '<div class="empty">Erro ao conectar com a API.</div>'
-      }
-    }
-
-    async function carregarEstoque() {
-      estoqueWrap.innerHTML = '<div class="empty">Carregando estoque...</div>'
-
-      try {
-        const filtroProduto = estoqueFiltroProduto?.value || ""
-        const urlEstoque = filtroProduto
-          ? API_URL + "/admin/estoque?product_id=" + encodeURIComponent(filtroProduto)
-          : API_URL + "/admin/estoque"
-
-        const resposta = await fetch(urlEstoque, {
-          headers: {
-            Authorization: "Bearer " + getToken()
-          }
-        })
-
-        const dados = await lerRespostaSegura(resposta)
-
-        if (!resposta.ok) {
-          estoqueWrap.innerHTML = '<div class="empty">' + (dados.erro || "Erro ao carregar estoque.") + '</div>'
-          return
-        }
-
-        if (!Array.isArray(dados) || !dados.length) {
-          estoqueWrap.innerHTML = '<div class="empty">Nenhum item de estoque cadastrado.</div>'
-          return
-        }
-
-        let html = `
-          <table>
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Produto</th>
-                <th>Login</th>
-                <th>Senha</th>
-                <th>Extra</th>
-                <th>Status</th>
-                <th>Acoes</th>
-              </tr>
-            </thead>
-            <tbody>
-        `
-
-        for (const item of dados) {
-          const itemJson = encodeURIComponent(JSON.stringify(item))
-          const status = String(item.status || "available").toLowerCase()
-          const statusClasse = status === "sold" ? "status-cancelado" : "status-entregue"
-          const statusLabel = status === "sold" ? "vendido" : "disponivel"
-
-          html += `
-            <tr>
-              <td>${item.id}</td>
-              <td>${item.product_name ?? "-"}</td>
-              <td>${item.content_login ?? "-"}</td>
-              <td>${item.content_password ?? "-"}</td>
-              <td>${item.content_extra ?? "-"}</td>
-              <td><span class="status-pill ${statusClasse}">${statusLabel}</span></td>
-              <td>
-                <div class="produto-actions">
-                  <button class="btn btn-secondary small" onclick="editarEstoque('${itemJson}')">Editar</button>
-                  <button class="btn btn-danger small" onclick="deletarEstoque(${item.id})">Excluir</button>
-                </div>
-              </td>
-            </tr>
-          `
-        }
-
-        html += `
-            </tbody>
-          </table>
-        `
-
-        estoqueWrap.innerHTML = html
-      } catch (error) {
-        estoqueWrap.innerHTML = '<div class="empty">Erro ao conectar com a API.</div>'
-      }
-    }
-
-    async function salvarEstoque() {
-      limparStatus(estoqueStatusMsg)
-
-      const id = estoqueIdInput.value.trim()
-      const produtoId = Number(estoqueProdutoSelect.value)
-      const login = estoqueLoginInput.value.trim()
-      const senha = estoqueSenhaInput.value.trim()
-      const extra = estoqueExtraInput.value.trim()
-      const status = estoqueStatusSelect.value
-
-      if (!produtoId || !login || !senha) {
-        mostrarStatus(estoqueStatusMsg, "Preencha produto, login e senha.", "error")
-        return
-      }
-
-      const payload = {
-        product_id: produtoId,
-        content_login: login,
-        content_password: senha,
-        content_extra: extra || null,
-        status
-      }
-
-      const url = id
-        ? API_URL + "/admin/estoque/" + id
-        : API_URL + "/admin/estoque"
-
-      const method = id ? "PUT" : "POST"
-
-      try {
-        const resposta = await fetch(url, {
-          method,
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: "Bearer " + getToken()
-          },
-          body: JSON.stringify(payload)
-        })
-
-        const dados = await lerRespostaSegura(resposta)
-
-        if (!resposta.ok) {
-          mostrarStatus(estoqueStatusMsg, dados.erro || "Erro ao salvar item de estoque.", "error")
-          return
-        }
-
-        mostrarStatus(
-          estoqueStatusMsg,
-          id ? "Item de estoque atualizado." : "Item de estoque criado.",
-          "ok"
-        )
-
-        limparFormularioEstoque()
-        carregarEstoque()
-        carregarDashboard()
-        carregarProdutos()
-      } catch (error) {
-        mostrarStatus(estoqueStatusMsg, "Erro ao conectar com a API.", "error")
-      }
-    }
-
-    function editarEstoque(itemCodificado) {
-      const item = JSON.parse(decodeURIComponent(itemCodificado))
-
-      estoqueIdInput.value = item.id
-      estoqueProdutoSelect.value = item.product_id ?? ""
-      estoqueLoginInput.value = item.content_login ?? ""
-      estoqueSenhaInput.value = item.content_password ?? ""
-      estoqueExtraInput.value = item.content_extra ?? ""
-      estoqueStatusSelect.value = String(item.status || "available").toLowerCase()
-
-      estoqueFormTitle.textContent = "Editar item de estoque"
-      mostrarStatus(estoqueStatusMsg, "Modo edicao ativado para o item ID " + item.id, "warn")
-      window.scrollTo({ top: 0, behavior: "smooth" })
-    }
-
-    async function deletarEstoque(id) {
-      const confirmar = confirm("Tem certeza que deseja excluir este item de estoque?")
-
-      if (!confirmar) {
-        return
-      }
-
-      try {
-        const resposta = await fetch(API_URL + "/admin/estoque/" + id, {
-          method: "DELETE",
-          headers: {
-            Authorization: "Bearer " + getToken()
-          }
-        })
-
-        const dados = await lerRespostaSegura(resposta)
-
-        if (!resposta.ok) {
-          alert(dados.erro || "Erro ao excluir item de estoque.")
-          return
-        }
-
-        alert("Item de estoque excluido com sucesso.")
-        carregarEstoque()
-        carregarDashboard()
-        carregarProdutos()
-      } catch (error) {
-        alert("Erro ao conectar com a API.")
-      }
-    }
-
-    async function carregarPedidos() {
-      pedidosWrap.innerHTML = '<div class="empty">Carregando pedidos...</div>'
-
-      try {
-        const resposta = await fetch(API_URL + "/admin/pedidos", {
-          headers: {
-            Authorization: "Bearer " + getToken()
-          }
-        })
-
-        const dados = await lerRespostaSegura(resposta)
-
-        if (!resposta.ok) {
-          pedidosWrap.innerHTML = '<div class="empty">' + (dados.erro || "Erro ao carregar pedidos.") + '</div>'
-          return
-        }
-
-        if (!Array.isArray(dados) || !dados.length) {
-          atualizarResumoPedidos([])
-          pedidosWrap.innerHTML = '<div class="empty">Nenhum pedido encontrado ainda.</div>'
-          return
-        }
-
-        atualizarResumoPedidos(dados)
-
-        let html = `
-          <table>
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Produto</th>
-                <th>Cliente</th>
-                <th>Email</th>
-                <th>Preço</th>
-                <th>Status</th>
-                <th>Data</th>
-              </tr>
-            </thead>
-            <tbody>
-        `
-
-        for (const pedido of dados) {
-          const item = Array.isArray(pedido.order_items) ? pedido.order_items[0] : null
-          const produtoNome = item?.products?.name || "-"
-          const precoPedido = item?.price ?? pedido.total ?? 0
-          const clienteNome =
-            pedido.nome_cliente || pedido.customer_name || pedido.cliente_nome || "-"
-          const clienteEmail =
-            pedido.email_cliente || pedido.customer_email || pedido.cliente_email || "-"
-
-          const statusRaw = String(pedido.payment_status || pedido.status || "pending").toLowerCase()
-          let classeStatus = "status-pendente"
-          let statusLabel = "pendente"
-
-          if (["paid", "approved"].includes(statusRaw)) {
-            classeStatus = "status-entregue"
-            statusLabel = "pago"
-          } else if (
-            ["cancelled", "canceled", "rejected", "refunded", "chargeback"].includes(statusRaw)
-          ) {
-            classeStatus = "status-cancelado"
-            statusLabel = "cancelado"
-          }
-
-          const dataFormatada = pedido.created_at
-            ? new Date(pedido.created_at).toLocaleString("pt-BR")
-            : "-"
-
-          html += `
-            <tr>
-              <td>${pedido.id}</td>
-              <td>${produtoNome}</td>
-              <td>${clienteNome}</td>
-              <td>${clienteEmail}</td>
-              <td>${formatarMoeda(precoPedido)}</td>
-              <td><span class="status-pill ${classeStatus}">${statusLabel}</span></td>
-              <td>${dataFormatada}</td>
-            </tr>
-          `
-        }
-
-        html += `
-            </tbody>
-          </table>
-        `
-
-        pedidosWrap.innerHTML = html
-      } catch (error) {
-        pedidosWrap.innerHTML = '<div class="empty">Erro ao conectar com a API.</div>'
-      }
-    }
-
-    function editarProduto(produtoCodificado) {
-      const produto = JSON.parse(decodeURIComponent(produtoCodificado))
-
-      produtoIdInput.value = produto.id
-      nomeProdutoInput.value = produto.name ?? produto.nome ?? ""
-      precoProdutoInput.value = produto.price ?? produto.preco ?? ""
-      produtoEstoqueInput.value = produto.stock_available ?? produto.estoque ?? ""
-      formTitle.textContent = "Editar produto"
-
-      mostrarStatus(produtoStatus, "Modo edição ativado para o produto ID " + produto.id, "warn")
-      window.scrollTo({ top: 0, behavior: "smooth" })
-    }
-
-    async function salvarProduto() {
-      limparStatus(produtoStatus)
-
-      const id = produtoIdInput.value.trim()
-      const nome = nomeProdutoInput.value.trim()
-      const preco = precoProdutoInput.value.trim()
-      if (!nome || preco === "") {
-        mostrarStatus(produtoStatus, "Preencha nome e preço.", "error")
-        return
-      }
-
-      const payload = {
-        name: nome,
-        price: Number(preco)
-      }
-
-      const url = id
-        ? API_URL + "/admin/produtos/" + id
-        : API_URL + "/admin/produtos"
-
-      const method = id ? "PUT" : "POST"
-
-      try {
-        const resposta = await fetch(url, {
-          method,
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: "Bearer " + getToken()
-          },
-          body: JSON.stringify(payload)
-        })
-
-        const dados = await lerRespostaSegura(resposta)
-
-        if (!resposta.ok) {
-          mostrarStatus(produtoStatus, dados.erro || "Erro ao salvar produto.", "error")
-          return
-        }
-
-        mostrarStatus(
-          produtoStatus,
-          id ? "Produto atualizado com sucesso." : "Produto criado com sucesso.",
-          "ok"
-        )
-
-        limparFormularioProduto()
-        carregarDashboard()
-        carregarProdutos()
-      } catch (error) {
-        mostrarStatus(produtoStatus, "Erro ao conectar com a API.", "error")
-      }
-    }
-
-    async function deletarProduto(id) {
-      const confirmar = confirm("Tem certeza que deseja excluir este produto?")
-
-      if (!confirmar) {
-        return
-      }
-
-      try {
-        const resposta = await fetch(API_URL + "/admin/produtos/" + id, {
-          method: "DELETE",
-          headers: {
-            Authorization: "Bearer " + getToken()
-          }
-        })
-
-        const dados = await lerRespostaSegura(resposta)
-
-        if (!resposta.ok) {
-          alert(dados.erro || "Erro ao excluir produto.")
-          return
-        }
-
-        alert("Produto excluído com sucesso.")
-        carregarDashboard()
-        carregarProdutos()
-      } catch (error) {
-        alert("Erro ao conectar com a API.")
-      }
-    }
-
-    async function logout() {
+    mostrarStatus(loginStatus, "Login realizado com sucesso.", "ok")
+
+    mostrarTelaAdmin()
+    carregarDashboard()
+    carregarProdutos()
+    carregarPedidos()
+    carregarEstoque()
+  } catch (error) {
+    mostrarStatus(loginStatus, "Falha ao conectar com a API.", "error")
+  }
+}
+
+async function verificarSessao() {
+  if (!supabaseClient || !SUPABASE_URL || !SUPABASE_ANON_KEY) {
+    mostrarTelaLogin()
+    mostrarStatus(loginStatus, "Configure o Supabase em config.js.", "warn")
+    return
+  }
+
+  const sessao = await carregarSessao()
+
+  if (!sessao) {
+    mostrarTelaLogin()
+    return
+  }
+
+  try {
+    const { data, error } = await supabaseClient.auth.getUser()
+    const usuario = data?.user || sessao.user
+
+    if (error || !usuario) {
       await sairSessao()
       mostrarTelaLogin()
-      limparFormularioProduto()
-      limparFormularioEstoque()
-      limparStatus(loginStatus)
-      limparStatus(produtoStatus)
-      limparStatus(estoqueStatusMsg)
-      produtosWrap.innerHTML = ""
-      estoqueWrap.innerHTML = ""
-      pedidosWrap.innerHTML = ""
-      totalProdutosPill.textContent = "Produtos: 0"
-      estoqueTotalPill.textContent = "Estoque disponivel: 0"
-      totalPedidosPill.textContent = "Pedidos: 0"
-      statPedidosTotais.textContent = "0"
-      statFaturamentoTotal.textContent = "R$ 0,00"
-      statPedidosHoje.textContent = "0"
-      statFaturamentoHoje.textContent = "R$ 0,00"
-      statProdutosTotais.textContent = "0"
-      statEstoqueTotal.textContent = "0"
-      senhaInput.value = ""
-      if (estoqueFiltroProduto) {
-        estoqueFiltroProduto.value = ""
-      }
+      return
     }
 
-    btnLogin.addEventListener("click", login)
-    btnSalvarProduto.addEventListener("click", salvarProduto)
-    btnCancelarEdicao.addEventListener("click", () => {
-      limparFormularioProduto()
-      limparStatus(produtoStatus)
-    })
-    btnSalvarEstoque.addEventListener("click", salvarEstoque)
-    btnCancelarEstoque.addEventListener("click", () => {
-      limparFormularioEstoque()
-      limparStatus(estoqueStatusMsg)
-    })
-    btnAtualizar.addEventListener("click", carregarProdutos)
-    btnAtualizarPedidos.addEventListener("click", carregarPedidos)
-    btnAtualizarDashboard.addEventListener("click", carregarDashboard)
-    btnAtualizarEstoque.addEventListener("click", carregarEstoque)
-    if (estoqueFiltroProduto) {
-      estoqueFiltroProduto.addEventListener("change", carregarEstoque)
-    }
-    btnLimparFiltroEstoque.addEventListener("click", () => {
-      if (estoqueFiltroProduto) {
-        estoqueFiltroProduto.value = ""
-      }
-      carregarEstoque()
-    })
-    btnLogoutTop.addEventListener("click", logout)
+    const perfil = await obterPerfilUsuario(usuario)
+    usuarioResumo = montarResumoUsuario(usuario, perfil)
 
-    verificarSessao()
-  </script>
+    if (!ehAdmin(usuarioResumo?.papel)) {
+      await sairSessao()
+      mostrarTelaLogin()
+      return
+    }
+
+    mostrarTelaAdmin()
+    carregarDashboard()
+    carregarProdutos()
+    carregarPedidos()
+    carregarEstoque()
+  } catch (error) {
+    await sairSessao()
+    mostrarTelaLogin()
+  }
+}
+
+async function carregarDashboard() {
+  try {
+    const resposta = await fetch(API_URL + "/admin/dashboard", {
+      headers: {
+        Authorization: "Bearer " + getToken()
+      }
+    })
+
+    const dados = await lerRespostaSegura(resposta)
+
+    if (!resposta.ok) {
+      return
+    }
+
+    statPedidosTotais.textContent = dados.pedidos_totais ?? 0
+    statFaturamentoTotal.textContent = formatarMoeda(dados.faturamento_total ?? 0)
+    statPedidosHoje.textContent = dados.pedidos_hoje ?? 0
+    statFaturamentoHoje.textContent = formatarMoeda(dados.faturamento_hoje ?? 0)
+    statProdutosTotais.textContent = dados.produtos_totais ?? 0
+    statEstoqueTotal.textContent = dados.estoque_disponivel ?? dados.estoque_total ?? 0
+  } catch (error) {}
+}
+
+async function carregarProdutos() {
+  produtosWrap.innerHTML = '<div class="empty">Carregando produtos...</div>'
+
+  try {
+    const resposta = await fetch(API_URL + "/admin/produtos", {
+      headers: {
+        Authorization: "Bearer " + getToken()
+      }
+    })
+
+    const dados = await lerRespostaSegura(resposta)
+
+    if (!resposta.ok) {
+      produtosWrap.innerHTML = '<div class="empty">' + (dados.erro || "Erro ao carregar produtos.") + "</div>"
+      return
+    }
+
+    const lista = Array.isArray(dados) ? dados : []
+    atualizarResumoProdutos(lista)
+    popularSelectProdutos(lista)
+
+    if (!lista.length) {
+      produtosWrap.innerHTML = '<div class="empty">Nenhum produto cadastrado.</div>'
+      return
+    }
+
+    let html = `
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Nome</th>
+            <th>Categoria</th>
+            <th>Preço</th>
+            <th>Promo</th>
+            <th>Qtd</th>
+            <th>Disponível</th>
+            <th>Vendas</th>
+            <th>Status</th>
+            <th>Destaque</th>
+            <th>Ações</th>
+          </tr>
+        </thead>
+        <tbody>
+    `
+
+    for (const produto of lista) {
+      const produtoJson = encodeURIComponent(JSON.stringify(produto))
+      const nomeProduto = produto.nome ?? produto.name ?? "Produto"
+      const categoria = produto.categoria ?? "-"
+      const preco = Number(produto.preco ?? produto.price ?? 0)
+      const promo = produto.preco_promocional ?? null
+      const quantidade = produto.quantidade ?? 0
+      const estoqueNumero = Number(produto.stock_available ?? produto.estoque ?? 0)
+      const totalVendas = produto.total_vendas ?? 0
+      const ativo = produto.ativo !== undefined ? Boolean(produto.ativo) : true
+      const destaque = produto.destaque !== undefined ? Boolean(produto.destaque) : false
+      const classeEstoque = estoqueNumero <= 3 ? "stock-low" : "stock-ok"
+
+      html += `
+        <tr>
+          <td>${produto.id}</td>
+          <td>${nomeProduto}</td>
+          <td>${categoria}</td>
+          <td>${formatarMoeda(preco)}</td>
+          <td>${promo ? formatarMoeda(promo) : "-"}</td>
+          <td>${quantidade ?? 0}</td>
+          <td class="${classeEstoque}">${estoqueNumero}</td>
+          <td>${totalVendas}</td>
+          <td><span class="status-pill ${ativo ? "status-entregue" : "status-cancelado"}">${ativo ? "ativo" : "inativo"}</span></td>
+          <td><span class="status-pill ${destaque ? "status-entregue" : "status-pendente"}">${destaque ? "sim" : "não"}</span></td>
+          <td>
+            <div class="produto-actions">
+              <button class="btn btn-secondary small" onclick="editarProduto('${produtoJson}')">Editar</button>
+              <button class="btn btn-danger small" onclick="alternarAtivo('${produto.id}', ${ativo})">
+                ${ativo ? "Inativar" : "Ativar"}
+              </button>
+            </div>
+          </td>
+        </tr>
+      `
+    }
+
+    html += `
+        </tbody>
+      </table>
+    `
+
+    produtosWrap.innerHTML = html
+  } catch (error) {
+    produtosWrap.innerHTML = '<div class="empty">Erro ao conectar com a API.</div>'
+  }
+}
+async function carregarEstoque() {
+  estoqueWrap.innerHTML = '<div class="empty">Carregando estoque...</div>'
+
+  try {
+    const filtroProduto = estoqueFiltroProduto?.value || ""
+    const urlEstoque = filtroProduto
+      ? API_URL + "/admin/estoque?product_id=" + encodeURIComponent(filtroProduto)
+      : API_URL + "/admin/estoque"
+
+    const resposta = await fetch(urlEstoque, {
+      headers: {
+        Authorization: "Bearer " + getToken()
+      }
+    })
+
+    const dados = await lerRespostaSegura(resposta)
+
+    if (!resposta.ok) {
+      estoqueWrap.innerHTML = '<div class="empty">' + (dados.erro || "Erro ao carregar estoque.") + "</div>"
+      return
+    }
+
+    if (!Array.isArray(dados) || !dados.length) {
+      estoqueWrap.innerHTML = '<div class="empty">Nenhum item de estoque cadastrado.</div>'
+      return
+    }
+
+    let html = `
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Produto</th>
+            <th>Login</th>
+            <th>Senha</th>
+            <th>Extra</th>
+            <th>Status</th>
+            <th>Ações</th>
+          </tr>
+        </thead>
+        <tbody>
+    `
+
+    for (const item of dados) {
+      const itemJson = encodeURIComponent(JSON.stringify(item))
+      const status = String(item.status || "available").toLowerCase()
+      const statusClasse = status === "sold" ? "status-cancelado" : "status-entregue"
+      const statusLabel = status === "sold" ? "vendido" : "disponível"
+
+      html += `
+        <tr>
+          <td>${item.id}</td>
+          <td>${item.product_name ?? "-"}</td>
+          <td>${item.content_login ?? "-"}</td>
+          <td>${item.content_password ?? "-"}</td>
+          <td>${item.content_extra ?? "-"}</td>
+          <td><span class="status-pill ${statusClasse}">${statusLabel}</span></td>
+          <td>
+            <div class="produto-actions">
+              <button class="btn btn-secondary small" onclick="editarEstoque('${itemJson}')">Editar</button>
+              <button class="btn btn-danger small" onclick="deletarEstoque(${item.id})">Excluir</button>
+            </div>
+          </td>
+        </tr>
+      `
+    }
+
+    html += `
+        </tbody>
+      </table>
+    `
+
+    estoqueWrap.innerHTML = html
+  } catch (error) {
+    estoqueWrap.innerHTML = '<div class="empty">Erro ao conectar com a API.</div>'
+  }
+}
+
+async function salvarEstoque() {
+  limparStatus(estoqueStatusMsg)
+
+  const id = estoqueIdInput.value.trim()
+  const produtoId = Number(estoqueProdutoSelect.value)
+  const login = estoqueLoginInput.value.trim()
+  const senha = estoqueSenhaInput.value.trim()
+  const extra = estoqueExtraInput.value.trim()
+  const status = estoqueStatusSelect.value
+
+  if (!produtoId || !login || !senha) {
+    mostrarStatus(estoqueStatusMsg, "Preencha produto, login e senha.", "error")
+    return
+  }
+
+  const payload = {
+    product_id: produtoId,
+    content_login: login,
+    content_password: senha,
+    content_extra: extra || null,
+    status
+  }
+
+  const url = id
+    ? API_URL + "/admin/estoque/" + id
+    : API_URL + "/admin/estoque"
+
+  const method = id ? "PUT" : "POST"
+
+  try {
+    const resposta = await fetch(url, {
+      method,
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer " + getToken()
+      },
+      body: JSON.stringify(payload)
+    })
+
+    const dados = await lerRespostaSegura(resposta)
+
+    if (!resposta.ok) {
+      mostrarStatus(estoqueStatusMsg, dados.erro || "Erro ao salvar item de estoque.", "error")
+      return
+    }
+
+    mostrarStatus(
+      estoqueStatusMsg,
+      id ? "Item de estoque atualizado." : "Item de estoque criado.",
+      "ok"
+    )
+
+    limparFormularioEstoque()
+    carregarEstoque()
+    carregarDashboard()
+    carregarProdutos()
+  } catch (error) {
+    mostrarStatus(estoqueStatusMsg, "Erro ao conectar com a API.", "error")
+  }
+}
+
+function editarEstoque(itemCodificado) {
+  const item = JSON.parse(decodeURIComponent(itemCodificado))
+
+  estoqueIdInput.value = item.id
+  estoqueProdutoSelect.value = item.product_id ?? ""
+  estoqueLoginInput.value = item.content_login ?? ""
+  estoqueSenhaInput.value = item.content_password ?? ""
+  estoqueExtraInput.value = item.content_extra ?? ""
+  estoqueStatusSelect.value = String(item.status || "available").toLowerCase()
+
+  estoqueFormTitle.textContent = "Editar item de estoque"
+  mostrarStatus(estoqueStatusMsg, "Modo edição ativado para o item ID " + item.id, "warn")
+  window.scrollTo({ top: 0, behavior: "smooth" })
+}
+
+async function deletarEstoque(id) {
+  const confirmar = confirm("Tem certeza que deseja excluir este item de estoque?")
+
+  if (!confirmar) {
+    return
+  }
+
+  try {
+    const resposta = await fetch(API_URL + "/admin/estoque/" + id, {
+      method: "DELETE",
+      headers: {
+        Authorization: "Bearer " + getToken()
+      }
+    })
+
+    const dados = await lerRespostaSegura(resposta)
+
+    if (!resposta.ok) {
+      alert(dados.erro || "Erro ao excluir item de estoque.")
+      return
+    }
+
+    alert("Item de estoque excluído com sucesso.")
+    carregarEstoque()
+    carregarDashboard()
+    carregarProdutos()
+  } catch (error) {
+    alert("Erro ao conectar com a API.")
+  }
+}
+async function carregarPedidos() {
+  pedidosWrap.innerHTML = '<div class="empty">Carregando pedidos...</div>'
+
+  try {
+    const resposta = await fetch(API_URL + "/admin/pedidos", {
+      headers: {
+        Authorization: "Bearer " + getToken()
+      }
+    })
+
+    const dados = await lerRespostaSegura(resposta)
+
+    if (!resposta.ok) {
+      pedidosWrap.innerHTML = '<div class="empty">' + (dados.erro || "Erro ao carregar pedidos.") + "</div>"
+      return
+    }
+
+    if (!Array.isArray(dados) || !dados.length) {
+      atualizarResumoPedidos([])
+      pedidosWrap.innerHTML = '<div class="empty">Nenhum pedido encontrado ainda.</div>'
+      return
+    }
+
+    atualizarResumoPedidos(dados)
+
+    let html = `
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Produto</th>
+            <th>Cliente</th>
+            <th>Email</th>
+            <th>Preço</th>
+            <th>Status</th>
+            <th>Data</th>
+          </tr>
+        </thead>
+        <tbody>
+    `
+
+    for (const pedido of dados) {
+      const item = Array.isArray(pedido.order_items) ? pedido.order_items[0] : null
+      const produtoNome = item?.products?.nome || item?.products?.name || "-"
+      const precoPedido = item?.price ?? pedido.total ?? 0
+      const clienteNome =
+        pedido.nome_cliente || pedido.customer_name || pedido.cliente_nome || "-"
+      const clienteEmail =
+        pedido.email_cliente || pedido.customer_email || pedido.cliente_email || "-"
+
+      const statusRaw = String(pedido.payment_status || pedido.status || "pending").toLowerCase()
+      let classeStatus = "status-pendente"
+      let statusLabel = "pendente"
+
+      if (["paid", "approved"].includes(statusRaw)) {
+        classeStatus = "status-entregue"
+        statusLabel = "pago"
+      } else if (
+        ["cancelled", "canceled", "rejected", "refunded", "chargeback"].includes(statusRaw)
+      ) {
+        classeStatus = "status-cancelado"
+        statusLabel = "cancelado"
+      }
+
+      const dataFormatada = pedido.created_at
+        ? new Date(pedido.created_at).toLocaleString("pt-BR")
+        : "-"
+
+      html += `
+        <tr>
+          <td>${pedido.id}</td>
+          <td>${produtoNome}</td>
+          <td>${clienteNome}</td>
+          <td>${clienteEmail}</td>
+          <td>${formatarMoeda(precoPedido)}</td>
+          <td><span class="status-pill ${classeStatus}">${statusLabel}</span></td>
+          <td>${dataFormatada}</td>
+        </tr>
+      `
+    }
+
+    html += `
+        </tbody>
+      </table>
+    `
+
+    pedidosWrap.innerHTML = html
+  } catch (error) {
+    pedidosWrap.innerHTML = '<div class="empty">Erro ao conectar com a API.</div>'
+  }
+}
+
+function editarProduto(produtoCodificado) {
+  const produto = JSON.parse(decodeURIComponent(produtoCodificado))
+
+  produtoIdInput.value = produto.id
+  nomeProdutoInput.value = produto.nome ?? produto.name ?? ""
+  slugProdutoInput.value = produto.slug ?? ""
+  categoriaProdutoSelect.value = produto.categoria ?? "outros"
+  descricaoProdutoInput.value = produto.descricao ?? produto.description ?? ""
+  precoProdutoInput.value = produto.preco ?? produto.price ?? ""
+  precoPromocionalInput.value = produto.preco_promocional ?? ""
+  quantidadeProdutoInput.value = produto.quantidade ?? ""
+  bannerUrlInput.value = produto.banner_url ?? produto.image_url ?? ""
+  totalVendasInput.value = produto.total_vendas ?? 0
+  ativoProdutoInput.checked = produto.ativo !== undefined ? Boolean(produto.ativo) : true
+  destaqueProdutoInput.checked = produto.destaque !== undefined ? Boolean(produto.destaque) : false
+  produtoEstoqueInput.value = produto.stock_available ?? produto.estoque ?? 0
+
+  atualizarPreviewBanner(bannerUrlInput.value)
+  formTitle.textContent = "Editar produto"
+
+  mostrarStatus(produtoStatus, "Modo edição ativado para o produto ID " + produto.id, "warn")
+  window.scrollTo({ top: 0, behavior: "smooth" })
+}
+
+async function salvarProduto() {
+  limparStatus(produtoStatus)
+
+  const id = produtoIdInput.value.trim()
+  const nome = nomeProdutoInput.value.trim()
+  const slug = slugProdutoInput.value.trim() || gerarSlug(nome)
+  const categoria = categoriaProdutoSelect.value || "outros"
+  const descricao = descricaoProdutoInput.value.trim()
+  const preco = precoProdutoInput.value.trim()
+  const precoPromocional = precoPromocionalInput.value.trim()
+  const quantidade = quantidadeProdutoInput.value.trim()
+  const ativo = ativoProdutoInput.checked
+  const destaque = destaqueProdutoInput.checked
+
+  if (!nome || preco === "") {
+    mostrarStatus(produtoStatus, "Preencha nome e preço.", "error")
+    return
+  }
+
+  const precoNumero = Number(preco)
+  if (Number.isNaN(precoNumero) || precoNumero <= 0) {
+    mostrarStatus(produtoStatus, "Preço inválido.", "error")
+    return
+  }
+
+  let bannerUrlFinal = bannerUrlInput.value.trim()
+
+  try {
+    bannerUrlFinal = await uploadBannerSeNecessario(slug)
+  } catch (error) {
+    mostrarStatus(produtoStatus, error.message || "Erro ao enviar banner.", "error")
+    return
+  }
+
+  if (bannerUrlFinal) {
+    bannerUrlInput.value = bannerUrlFinal
+    atualizarPreviewBanner(bannerUrlFinal)
+  }
+
+  const payload = {
+    nome,
+    slug: slug || null,
+    categoria,
+    descricao: descricao || null,
+    banner_url: bannerUrlFinal || null,
+    preco: precoNumero,
+    preco_promocional: precoPromocional ? Number(precoPromocional) : null,
+    quantidade: quantidade ? Number(quantidade) : 0,
+    ativo,
+    destaque
+  }
+
+  const url = id
+    ? API_URL + "/admin/produtos/" + id
+    : API_URL + "/admin/produtos"
+
+  const method = id ? "PUT" : "POST"
+
+  try {
+    const resposta = await fetch(url, {
+      method,
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer " + getToken()
+      },
+      body: JSON.stringify(payload)
+    })
+
+    const dados = await lerRespostaSegura(resposta)
+
+    if (!resposta.ok) {
+      mostrarStatus(produtoStatus, dados.erro || "Erro ao salvar produto.", "error")
+      return
+    }
+
+    mostrarStatus(
+      produtoStatus,
+      id ? "Produto atualizado com sucesso." : "Produto criado com sucesso.",
+      "ok"
+    )
+
+    limparFormularioProduto()
+    carregarDashboard()
+    carregarProdutos()
+  } catch (error) {
+    mostrarStatus(produtoStatus, "Erro ao conectar com a API.", "error")
+  }
+}
+
+async function alternarAtivo(id, ativoAtual) {
+  const novoStatus = !ativoAtual
+  const confirmar = confirm(`Deseja ${novoStatus ? "ativar" : "inativar"} este produto?`)
+
+  if (!confirmar) {
+    return
+  }
+
+  try {
+    const resposta = await fetch(API_URL + "/admin/produtos/" + id, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer " + getToken()
+      },
+      body: JSON.stringify({ ativo: novoStatus })
+    })
+
+    const dados = await lerRespostaSegura(resposta)
+
+    if (!resposta.ok) {
+      alert(dados.erro || "Erro ao atualizar produto.")
+      return
+    }
+
+    alert(novoStatus ? "Produto ativado." : "Produto inativado.")
+    carregarDashboard()
+    carregarProdutos()
+  } catch (error) {
+    alert("Erro ao conectar com a API.")
+  }
+}
+
+async function logout() {
+  await sairSessao()
+  mostrarTelaLogin()
+  limparFormularioProduto()
+  limparFormularioEstoque()
+  limparStatus(loginStatus)
+  limparStatus(produtoStatus)
+  limparStatus(estoqueStatusMsg)
+  produtosWrap.innerHTML = ""
+  estoqueWrap.innerHTML = ""
+  pedidosWrap.innerHTML = ""
+  totalProdutosPill.textContent = "Produtos: 0"
+  estoqueTotalPill.textContent = "Estoque disponível: 0"
+  totalPedidosPill.textContent = "Pedidos: 0"
+  statPedidosTotais.textContent = "0"
+  statFaturamentoTotal.textContent = "R$ 0,00"
+  statPedidosHoje.textContent = "0"
+  statFaturamentoHoje.textContent = "R$ 0,00"
+  statProdutosTotais.textContent = "0"
+  statEstoqueTotal.textContent = "0"
+  senhaInput.value = ""
+  if (estoqueFiltroProduto) {
+    estoqueFiltroProduto.value = ""
+  }
+}
+if (bannerUrlInput) {
+  bannerUrlInput.addEventListener("input", () => {
+    atualizarPreviewBanner(bannerUrlInput.value)
+  })
+}
+
+if (bannerFileInput) {
+  bannerFileInput.addEventListener("change", () => {
+    const arquivo = bannerFileInput.files?.[0]
+    if (arquivo) {
+      const previewUrl = URL.createObjectURL(arquivo)
+      atualizarPreviewBanner(previewUrl)
+    } else {
+      atualizarPreviewBanner(bannerUrlInput.value)
+    }
+  })
+}
+
+if (nomeProdutoInput) {
+  nomeProdutoInput.addEventListener("input", () => {
+    if (!slugProdutoInput.value.trim()) {
+      slugProdutoInput.value = gerarSlug(nomeProdutoInput.value)
+    }
+  })
+}
+
+btnLogin.addEventListener("click", login)
+btnSalvarProduto.addEventListener("click", salvarProduto)
+btnCancelarEdicao.addEventListener("click", () => {
+  limparFormularioProduto()
+  limparStatus(produtoStatus)
+})
+btnSalvarEstoque.addEventListener("click", salvarEstoque)
+btnCancelarEstoque.addEventListener("click", () => {
+  limparFormularioEstoque()
+  limparStatus(estoqueStatusMsg)
+})
+btnAtualizar.addEventListener("click", carregarProdutos)
+btnAtualizarPedidos.addEventListener("click", carregarPedidos)
+btnAtualizarDashboard.addEventListener("click", carregarDashboard)
+btnAtualizarEstoque.addEventListener("click", carregarEstoque)
+
+if (estoqueFiltroProduto) {
+  estoqueFiltroProduto.addEventListener("change", carregarEstoque)
+}
+
+btnLimparFiltroEstoque.addEventListener("click", () => {
+  if (estoqueFiltroProduto) {
+    estoqueFiltroProduto.value = ""
+  }
+  carregarEstoque()
+})
+
+btnLogoutTop.addEventListener("click", logout)
+
+verificarSessao()
+
+</script>
 </body>
 </html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

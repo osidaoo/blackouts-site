@@ -321,7 +321,7 @@
 
         dados.forEach((pedido) => {
           const item = Array.isArray(pedido.order_items) ? pedido.order_items[0] : null
-          const produtoNome = item?.products?.name || "-"
+          const produtoNome = item?.products?.nome || item?.products?.name || "-"
           const total = item?.price ?? pedido.total ?? 0
           const statusRaw = String(pedido.payment_status || pedido.status || "pending").toLowerCase()
           const pago = ["paid", "approved"].includes(statusRaw)
