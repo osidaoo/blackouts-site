@@ -404,46 +404,69 @@ app.get("/pedido-status", async (req, res) => {
 
 app.post("/webhook/mercadopago", async (req, res) => {
   try {
-    const paymentId = req.body?.data?.id
+    console.log("Webhook Mercado Pago recebido:", JSON.stringify(req.body, null, 2))
+
+    const paymentId =
+      req.body?.data?.id ||
+      req.query?.id ||
+      req.body?.id
 
     if (!paymentId) {
+      console.log("paymentId não encontrado no webhook")
       return res.status(200).send("ok")
     }
 
+    if (!MP_ACCESS_TOKEN) {
+      console.log("MP_ACCESS_TOKEN não configurado")
+      return res.status(500).send("mercado pago nao configurado")
+    }
+
     const mpResponse = await fetch(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
+      method: "GET",
       headers: {
-        Authorization: `Bearer ${process.env.MP_ACCESS_TOKEN}`
+        "Authorization": `Bearer ${MP_ACCESS_TOKEN}`,
+        "Content-Type": "application/json"
       }
     })
 
     const pagamento = await mpResponse.json()
 
-    if (pagamento.status !== "approved") {
-      await supabase
-        .from("pagamentos")
-        .update({
-          webhook_recebido: true,
-          status: pagamento.status || "unknown",
-          detalhe_status: pagamento.status_detail || null
-        })
-        .eq("mp_payment_id", String(paymentId))
+    if (!mpResponse.ok) {
+      console.log("Erro ao consultar pagamento no Mercado Pago:", pagamento)
+      return res.status(500).send("erro ao consultar pagamento")
+    }
 
-      return res.status(200).send("ok")
+    console.log("Pagamento consultado:", pagamento)
+
+    if (pagamento.status !== "approved") {
+      console.log("Pagamento ainda não aprovado:", pagamento.status)
+      return res.status(200).send("pagamento ainda não aprovado")
     }
 
     const pedidoId = Number(pagamento.external_reference)
-    if (!pedidoId) return res.status(200).send("ok")
 
-    const { data: pedido } = await supabase
+    if (!pedidoId) {
+      console.log("external_reference inválido:", pagamento.external_reference)
+      return res.status(200).send("ok")
+    }
+
+    const { data: pedido, error: erroPedido } = await supabase
       .from("pedidos")
       .select("*")
       .eq("id", pedidoId)
       .single()
 
-    if (!pedido) return res.status(200).send("ok")
-    if (pedido.status === "pago") return res.status(200).send("ok")
+    if (erroPedido || !pedido) {
+      console.log("Pedido não encontrado:", erroPedido)
+      return res.status(200).send("ok")
+    }
 
-    const { data: conta } = await supabase
+    if (pedido.status === "pago") {
+      console.log("Pedido já estava pago:", pedido.id)
+      return res.status(200).send("ok")
+    }
+
+    const { data: conta, error: erroConta } = await supabase
       .from("contas_digitais")
       .select("*")
       .eq("produto_id", pedido.produto_id)
@@ -452,12 +475,12 @@ app.post("/webhook/mercadopago", async (req, res) => {
       .limit(1)
       .single()
 
-    if (!conta) {
-      console.log("SEM ESTOQUE PARA ENTREGAR")
+    if (erroConta || !conta) {
+      console.log("Sem estoque para entregar:", erroConta)
       return res.status(200).send("ok")
     }
 
-    await supabase
+    const { error: erroAtualizaConta } = await supabase
       .from("contas_digitais")
       .update({
         status: "vendida",
@@ -465,27 +488,45 @@ app.post("/webhook/mercadopago", async (req, res) => {
       })
       .eq("id", conta.id)
 
-    await supabase
+    if (erroAtualizaConta) {
+      console.log("Erro ao atualizar conta:", erroAtualizaConta)
+      return res.status(500).send("erro ao atualizar conta")
+    }
+
+    const agora = new Date().toISOString()
+
+    const { error: erroAtualizaPedido } = await supabase
       .from("pedidos")
       .update({
         status: "pago",
         conta_entregue_id: conta.id,
         payment_id_externo: String(paymentId),
-        entregue_em: new Date().toISOString()
+        entregue_em: agora
       })
       .eq("id", pedido.id)
 
-    await supabase
+    if (erroAtualizaPedido) {
+      console.log("Erro ao atualizar pedido:", erroAtualizaPedido)
+      return res.status(500).send("erro ao atualizar pedido")
+    }
+
+    const { error: erroAtualizaPagamento } = await supabase
       .from("pagamentos")
       .update({
         status: "approved",
         webhook_recebido: true,
-        pago_em: new Date().toISOString(),
+        pago_em: agora,
         detalhe_status: pagamento.status_detail || null
       })
       .eq("mp_payment_id", String(paymentId))
 
+    if (erroAtualizaPagamento) {
+      console.log("Erro ao atualizar pagamento:", erroAtualizaPagamento)
+      return res.status(500).send("erro ao atualizar pagamento")
+    }
+
     console.log("CONTA ENTREGUE:", conta.login)
+
     return res.status(200).send("ok")
   } catch (error) {
     console.log("Erro webhook:", error)
