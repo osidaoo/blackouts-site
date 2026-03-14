@@ -43,6 +43,9 @@ const supabase = createClient(
 
 const PORT = process.env.PORT || 3000
 const MP_ACCESS_TOKEN = process.env.MP_ACCESS_TOKEN
+const DELIVERY_BASE_URL = String(process.env.DELIVERY_BASE_URL || "https://blackouts.site")
+  .trim()
+  .replace(/\/+$/, "")
 
 const rateLimitLogin = criarRateLimiter({
   windowMs: 15 * 60 * 1000,
@@ -806,7 +809,7 @@ app.post("/pedidos", rateLimitPedidos, async (req, res) => {
         qr_code: qrCode,
         qr_code_base64: qrCodeBase64
       },
-      entrega_url: `https://blackouts-site.vercel.app/entrega.html?pedido=${order.id}&email=${encodeURIComponent(email_cliente)}`
+      entrega_url: `${DELIVERY_BASE_URL}/entrega.html?pedido=${order.id}&email=${encodeURIComponent(email_cliente)}`
     })
   } catch (error) {
     console.log("Erro ao criar pedido com PIX:", error)
