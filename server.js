@@ -261,6 +261,46 @@ async function reservarItemEstoque(productId) {
   return { data: null }
 }
 
+async function reservarItemEstoqueAtomico(productId) {
+  const { data, error } = await supabase.rpc("reserve_inventory_item", {
+    p_product_id: String(productId)
+  })
+
+  if (error) {
+    return { error }
+  }
+
+  if (!data) {
+    return { data: null }
+  }
+
+  if (Array.isArray(data)) {
+    return { data: data[0] || null }
+  }
+
+  return { data }
+}
+
+async function registrarAlertaSemEstoque({ orderId, paymentId, productId, email }) {
+  try {
+    const { error } = await supabase
+      .from("stock_alerts")
+      .insert([{
+        order_id: String(orderId),
+        payment_id: String(paymentId),
+        product_id: String(productId),
+        customer_email: email || null,
+        created_at: new Date().toISOString()
+      }])
+
+    if (error) {
+      console.log("Falha ao registrar alerta de estoque:", error.message)
+    }
+  } catch (error) {
+    console.log("Erro ao registrar alerta de estoque:", error)
+  }
+}
+
 app.get("/", (req, res) => {
   res.json({ status: "API Blackouts online" })
 })
@@ -953,12 +993,21 @@ app.post("/webhook/mercadopago", async (req, res) => {
       return res.status(200).send("ok")
     }
 
-    const { data: contaDisponivel, error: erroReserva } =
-      await reservarItemEstoque(orderItem.product_id)
+    let contaDisponivel = null
+    const reservaAtomica = await reservarItemEstoqueAtomico(orderItem.product_id)
 
-    if (erroReserva) {
-      console.log("Erro ao buscar estoque:", erroReserva)
-      return res.status(500).send("erro ao buscar estoque")
+    if (reservaAtomica.error) {
+      console.log("Reserva atomica falhou, usando fallback:", reservaAtomica.error.message)
+      const reservaFallback = await reservarItemEstoque(orderItem.product_id)
+
+      if (reservaFallback.error) {
+        console.log("Erro ao buscar estoque:", reservaFallback.error)
+        return res.status(500).send("erro ao buscar estoque")
+      }
+
+      contaDisponivel = reservaFallback.data
+    } else {
+      contaDisponivel = reservaAtomica.data
     }
 
     if (!contaDisponivel) {
@@ -978,6 +1027,20 @@ app.post("/webhook/mercadopago", async (req, res) => {
           status: "approved"
         })
         .eq("id", paymentRegistro.id)
+
+      console.log("Pagamento aprovado sem estoque:", {
+        orderId: order.id,
+        paymentId: paymentRegistro.id,
+        productId: orderItem.product_id,
+        email: order.customer_email || order.email_cliente || order.cliente_email || null
+      })
+
+      await registrarAlertaSemEstoque({
+        orderId: order.id,
+        paymentId: paymentRegistro.id,
+        productId: orderItem.product_id,
+        email: order.customer_email || order.email_cliente || order.cliente_email || null
+      })
 
       return res.status(200).send("ok")
     }
