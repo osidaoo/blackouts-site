@@ -411,7 +411,7 @@ input{
         <a href="#destaques">Destaques</a>
         <a href="#suporte">Suporte</a>
       </div>
-      <a class="btn btn-ghost" href="admin.html">Entrar</a>
+      <a class="btn btn-ghost" href="entrar/">Entrar</a>
     </header>
 
     <section class="hero" id="home">
@@ -424,7 +424,7 @@ input{
         <span class="badge">Compra segura</span>
       </div>
       <div class="hero-actions">
-        <a class="btn btn-primary" href="#destaques">Ver produtos</a>
+        <a class="btn btn-primary" href="produtos/">Ver produtos</a>
         <a class="btn btn-ghost" href="https://discord.gg/8BB4quCNGP" target="_blank" rel="noopener">Entrar no Discord</a>
       </div>
       <div class="hero-stats">
@@ -543,8 +543,10 @@ input{
   </div>
 </div>
 
+<script src="config.js"></script>
 <script>
-const API_URL = "https://blackouts-site.onrender.com"
+const CONFIG = window.__CONFIG__ || {}
+const API_URL = CONFIG.API_URL || "https://blackouts-site.onrender.com"
 
 function normalizeImageUrl(url){
   const raw = String(url || "").trim()

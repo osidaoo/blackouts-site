@@ -151,8 +151,10 @@
     </div>
   </div>
 
+  <script src="config.js"></script>
   <script>
-    const API_URL = "https://blackouts-site.onrender.com"
+    const CONFIG = window.__CONFIG__ || {}
+    const API_URL = CONFIG.API_URL || "https://blackouts-site.onrender.com"
 
     function getParam(nome) {
       const url = new URL(window.location.href)

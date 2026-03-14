@@ -1,0 +1,380 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" href="../favicon.svg" type="image/svg+xml">
+  <title>Blackouts | Painel do cliente</title>
+  <style>
+    @import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap");
+
+    :root{
+      --bg:#02040a;
+      --bg2:#060914;
+      --panel:rgba(8,12,20,.72);
+      --panel-strong:rgba(8,12,20,.86);
+      --line:rgba(59,130,246,.28);
+      --text:#f5f7ff;
+      --muted:#9aa8cc;
+      --primary:#3b82f6;
+      --primary2:#63b3ff;
+      --radius:16px;
+      --glow:0 0 18px rgba(59,130,246,.35);
+      --transition:0.25s ease;
+    }
+
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{
+      min-height:100vh;
+      font-family:"Inter", system-ui, sans-serif;
+      color:var(--text);
+      background:
+        radial-gradient(circle at 20% 10%, rgba(59,130,246,.18), transparent 32%),
+        radial-gradient(circle at 80% 15%, rgba(59,130,246,.12), transparent 38%),
+        linear-gradient(180deg, var(--bg), var(--bg2));
+    }
+    body::before{
+      content:"";
+      position:fixed;
+      inset:0;
+      background:
+        radial-gradient(rgba(255,255,255,.08) 1px, transparent 1px),
+        radial-gradient(rgba(255,255,255,.04) 1px, transparent 1px);
+      background-size:140px 140px, 220px 220px;
+      background-position:0 0, 60px 80px;
+      opacity:.25;
+      pointer-events:none;
+    }
+
+    .page{position:relative;z-index:1;}
+    .container{max-width:1100px;margin:0 auto;padding:32px 24px 70px;}
+
+    .nav{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:16px;
+      padding:14px 24px;
+      border-radius:999px;
+      background:rgba(5,8,16,.55);
+      border:1px solid rgba(255,255,255,.06);
+      backdrop-filter:blur(12px);
+      position:sticky;
+      top:16px;
+      z-index:10;
+    }
+    .brand{
+      font-weight:800;
+      letter-spacing:.22em;
+      color:#9dc7ff;
+      text-decoration:none;
+      position:relative;
+    }
+    .brand::before,
+    .brand::after{
+      content:"";
+      position:absolute;
+      top:50%;
+      width:60px;
+      height:2px;
+      background:linear-gradient(90deg, transparent, rgba(59,130,246,.9), transparent);
+      box-shadow:0 0 12px rgba(59,130,246,.6);
+    }
+    .brand::before{right:100%;margin-right:14px;}
+    .brand::after{left:100%;margin-left:14px;}
+
+    .nav-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+
+    .btn{
+      border:none;
+      border-radius:999px;
+      padding:10px 16px;
+      font-weight:600;
+      cursor:pointer;
+      text-decoration:none;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      font-size:13px;
+      transition:transform var(--transition), box-shadow var(--transition), background var(--transition);
+    }
+    .btn-primary{
+      background:linear-gradient(135deg, var(--primary), var(--primary2));
+      color:#051026;
+      box-shadow:0 12px 26px rgba(59,130,246,.35);
+    }
+    .btn-primary:hover{transform:translateY(-2px);box-shadow:0 16px 32px rgba(59,130,246,.45);}
+    .btn-ghost{
+      background:rgba(255,255,255,.06);
+      color:#dfe8ff;
+      border:1px solid rgba(255,255,255,.14);
+    }
+    .btn-ghost:hover{transform:translateY(-2px);box-shadow:var(--glow);}
+
+    h1{font-size:30px;margin:32px 0 8px;}
+    p{color:var(--muted);}
+
+    .status{
+      margin-top:16px;
+      padding:12px 14px;
+      border-radius:14px;
+      font-size:14px;
+      display:none;
+      white-space:pre-wrap;
+    }
+    .status.ok{
+      display:block;
+      background:rgba(61,220,151,.1);
+      color:#bdf5dc;
+      border:1px solid rgba(61,220,151,.2);
+    }
+    .status.error{
+      display:block;
+      background:rgba(255,95,122,.1);
+      color:#ffd6de;
+      border:1px solid rgba(255,95,122,.2);
+    }
+    .status.warn{
+      display:block;
+      background:rgba(255,184,77,.12);
+      color:#ffe1b3;
+      border:1px solid rgba(255,184,77,.2);
+    }
+
+    .orders{margin-top:26px;display:grid;gap:18px;}
+    .order-card{
+      background:var(--panel);
+      border:1px solid var(--line);
+      border-radius:var(--radius);
+      padding:20px;
+      display:grid;
+      gap:14px;
+      box-shadow:0 24px 60px rgba(8,18,40,.35);
+    }
+    .order-top{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;}
+    .order-title{font-size:18px;font-weight:600;}
+    .order-meta{color:var(--muted);font-size:13px;}
+
+    .pill{
+      padding:6px 12px;
+      border-radius:999px;
+      font-size:12px;
+      font-weight:600;
+      text-transform:uppercase;
+      letter-spacing:.08em;
+    }
+    .pill.paid{background:rgba(61,220,151,.15);color:#bdf5dc;border:1px solid rgba(61,220,151,.25);}
+    .pill.pending{background:rgba(255,184,77,.15);color:#ffe1b3;border:1px solid rgba(255,184,77,.25);}
+    .pill.error{background:rgba(255,95,122,.15);color:#ffd6de;border:1px solid rgba(255,95,122,.25);}
+
+    .delivery{
+      background:var(--panel-strong);
+      border:1px solid rgba(255,255,255,.1);
+      border-radius:14px;
+      padding:16px;
+      display:grid;
+      gap:8px;
+    }
+    .delivery strong{color:#a8d2ff;}
+    .delivery span{color:var(--muted);font-size:13px;}
+
+    .empty{color:var(--muted);text-align:center;padding:40px 0;}
+
+    @media (max-width: 800px){
+      .nav{flex-direction:column;align-items:flex-start;}
+      .order-top{flex-direction:column;}
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="container">
+      <header class="nav">
+        <a class="brand" href="../">BLACKOUTS</a>
+        <div class="nav-actions">
+          <a class="btn btn-ghost" href="../">Loja</a>
+          <button class="btn btn-primary" id="btnAtualizar">Atualizar</button>
+          <button class="btn btn-ghost" id="btnSair">Sair</button>
+        </div>
+      </header>
+
+      <h1>Painel do cliente</h1>
+      <p>Acompanhe seus pedidos e detalhes de entrega.</p>
+
+      <div id="status" class="status"></div>
+
+      <div id="orders" class="orders"></div>
+    </div>
+  </div>
+
+  <script src="../config.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    const CONFIG = window.__CONFIG__ || {}
+    const API_URL = CONFIG.API_URL || "https://blackouts-site.onrender.com"
+    const SUPABASE_URL = CONFIG.SUPABASE_URL || ""
+    const SUPABASE_ANON_KEY = CONFIG.SUPABASE_ANON_KEY || ""
+
+    const supabaseClient = window.supabase?.createClient
+      ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+        auth: {
+          persistSession: true,
+          autoRefreshToken: true,
+          detectSessionInUrl: true
+        }
+      })
+      : null
+
+    const statusEl = document.getElementById("status")
+    const ordersEl = document.getElementById("orders")
+    const btnSair = document.getElementById("btnSair")
+    const btnAtualizar = document.getElementById("btnAtualizar")
+
+    function mostrarStatus(texto, tipo) {
+      statusEl.className = "status " + tipo
+      statusEl.textContent = texto
+    }
+
+    function limparStatus() {
+      statusEl.className = "status"
+      statusEl.textContent = ""
+    }
+
+    function formatarMoeda(valor) {
+      return Number(valor || 0).toLocaleString("pt-BR", {
+        style: "currency",
+        currency: "BRL"
+      })
+    }
+
+    function formatarData(valor) {
+      if (!valor) return "-"
+      return new Date(valor).toLocaleString("pt-BR")
+    }
+
+    function parseEntrega(raw) {
+      if (!raw) return null
+      try {
+        return JSON.parse(raw)
+      } catch {
+        return { conteudo: raw }
+      }
+    }
+
+    async function sair() {
+      if (supabaseClient) {
+        await supabaseClient.auth.signOut()
+      }
+      window.location.href = "../entrar/"
+    }
+
+    async function carregarPedidos() {
+      limparStatus()
+      ordersEl.innerHTML = "<div class='empty'>Carregando pedidos...</div>"
+
+      if (!supabaseClient || !SUPABASE_URL || !SUPABASE_ANON_KEY) {
+        mostrarStatus("Configure o Supabase em config.js.", "warn")
+        ordersEl.innerHTML = ""
+        return
+      }
+
+      const { data } = await supabaseClient.auth.getSession()
+      const session = data?.session
+
+      if (!session) {
+        window.location.href = "../entrar/"
+        return
+      }
+
+      try {
+        const resposta = await fetch(API_URL + "/cliente/pedidos", {
+          headers: {
+            Authorization: "Bearer " + session.access_token
+          }
+        })
+
+        const texto = await resposta.text()
+        const dados = texto ? JSON.parse(texto) : []
+
+        if (resposta.status === 403) {
+          mostrarStatus("Acesso permitido apenas para clientes com compra aprovada.", "error")
+          await supabaseClient.auth.signOut()
+          setTimeout(() => {
+            window.location.href = "../entrar/"
+          }, 1500)
+          ordersEl.innerHTML = ""
+          return
+        }
+
+        if (!resposta.ok) {
+          mostrarStatus(dados.erro || "Erro ao carregar pedidos.", "error")
+          ordersEl.innerHTML = ""
+          return
+        }
+
+        if (!Array.isArray(dados) || !dados.length) {
+          ordersEl.innerHTML = "<div class='empty'>Nenhum pedido encontrado.</div>"
+          return
+        }
+
+        let html = ""
+
+        dados.forEach((pedido) => {
+          const item = Array.isArray(pedido.order_items) ? pedido.order_items[0] : null
+          const produtoNome = item?.products?.name || "-"
+          const total = item?.price ?? pedido.total ?? 0
+          const statusRaw = String(pedido.payment_status || pedido.status || "pending").toLowerCase()
+          const pago = ["paid", "approved"].includes(statusRaw)
+          const pillClass = pago ? "paid" : ["pending", "in_process"].includes(statusRaw) ? "pending" : "error"
+
+          const entrega = parseEntrega(item?.delivered_content)
+          const emailEntrega = pedido.customer_email || session.user?.email || ""
+          const linkEntrega = emailEntrega
+            ? `../entrega.html?pedido=${pedido.id}&email=${encodeURIComponent(emailEntrega)}`
+            : ""
+
+          html += `
+            <div class="order-card">
+              <div class="order-top">
+                <div>
+                  <div class="order-title">${produtoNome}</div>
+                  <div class="order-meta">Pedido #${pedido.id}</div>
+                  <div class="order-meta">${formatarData(pedido.created_at)}</div>
+                </div>
+                <div>
+                  <div class="pill ${pillClass}">${pago ? "Pago" : "Pendente"}</div>
+                  <div class="order-meta">Total: ${formatarMoeda(total)}</div>
+                </div>
+              </div>
+
+              <div class="delivery">
+                ${entrega && pago ? `
+                  <strong>Entrega liberada</strong>
+                  <span>Login: ${entrega.login || "-"}</span>
+                  <span>Senha: ${entrega.senha || "-"}</span>
+                  ${entrega.extra ? `<span>Extra: ${entrega.extra}</span>` : ""}
+                ` : `
+                  <strong>Entrega pendente</strong>
+                  <span>A conta sera liberada apos o pagamento confirmado.</span>
+                `}
+              </div>
+
+              ${linkEntrega ? `<a class="btn btn-ghost" href="${linkEntrega}" target="_blank" rel="noopener">Abrir entrega</a>` : ""}
+            </div>
+          `
+        })
+
+        ordersEl.innerHTML = html
+      } catch (error) {
+        mostrarStatus("Erro ao conectar com a API.", "error")
+        ordersEl.innerHTML = ""
+      }
+    }
+
+    btnSair.addEventListener("click", sair)
+    btnAtualizar.addEventListener("click", carregarPedidos)
+
+    carregarPedidos()
+  </script>
+</body>
+</html>

@@ -1,0 +1,284 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" href="../favicon.svg" type="image/svg+xml">
+  <title>Blackouts | Entrar</title>
+  <style>
+    @import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap");
+
+    :root{
+      --bg:#02040a;
+      --bg2:#060914;
+      --panel:rgba(8,12,20,.78);
+      --line:rgba(59,130,246,.28);
+      --text:#f5f7ff;
+      --muted:#9aa8cc;
+      --primary:#3b82f6;
+      --primary2:#63b3ff;
+      --radius:18px;
+      --glow:0 0 18px rgba(59,130,246,.35);
+      --transition:0.25s ease;
+    }
+
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{
+      min-height:100vh;
+      font-family:"Inter", system-ui, sans-serif;
+      color:var(--text);
+      background:
+        radial-gradient(circle at 20% 10%, rgba(59,130,246,.18), transparent 32%),
+        radial-gradient(circle at 80% 15%, rgba(59,130,246,.12), transparent 38%),
+        linear-gradient(180deg, var(--bg), var(--bg2));
+    }
+    body::before{
+      content:"";
+      position:fixed;
+      inset:0;
+      background:
+        radial-gradient(rgba(255,255,255,.08) 1px, transparent 1px),
+        radial-gradient(rgba(255,255,255,.04) 1px, transparent 1px);
+      background-size:140px 140px, 220px 220px;
+      background-position:0 0, 60px 80px;
+      opacity:.25;
+      pointer-events:none;
+    }
+
+    .page{position:relative;z-index:1;}
+    .container{max-width:520px;margin:0 auto;padding:40px 24px 60px;}
+
+    .nav{
+      max-width:1200px;
+      margin:24px auto 0;
+      padding:14px 24px;
+      border-radius:999px;
+      background:rgba(5,8,16,.55);
+      border:1px solid rgba(255,255,255,.06);
+      backdrop-filter:blur(12px);
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:16px;
+    }
+    .brand{
+      font-weight:800;
+      letter-spacing:.22em;
+      color:#9dc7ff;
+      text-decoration:none;
+      position:relative;
+    }
+    .brand::before,
+    .brand::after{
+      content:"";
+      position:absolute;
+      top:50%;
+      width:60px;
+      height:2px;
+      background:linear-gradient(90deg, transparent, rgba(59,130,246,.9), transparent);
+      box-shadow:0 0 12px rgba(59,130,246,.6);
+    }
+    .brand::before{right:100%;margin-right:14px;}
+    .brand::after{left:100%;margin-left:14px;}
+    .nav a{color:var(--muted);text-decoration:none;font-size:14px;}
+
+    .card{
+      margin-top:36px;
+      padding:32px;
+      background:var(--panel);
+      border:1px solid var(--line);
+      border-radius:var(--radius);
+      box-shadow:0 30px 80px rgba(8,18,40,.5), 0 0 40px rgba(59,130,246,.18);
+    }
+    h1{font-size:28px;margin-bottom:8px;}
+    p{color:var(--muted);line-height:1.6;margin-bottom:20px;}
+
+    label{display:block;margin-bottom:8px;color:var(--muted);font-size:13px;}
+    input{
+      width:100%;
+      padding:14px 16px;
+      border-radius:14px;
+      border:1px solid rgba(255,255,255,.12);
+      background:rgba(255,255,255,.04);
+      color:#fff;
+      outline:none;
+      margin-bottom:14px;
+      font-size:15px;
+    }
+
+    .actions{display:flex;gap:12px;flex-wrap:wrap;margin-top:10px;}
+    .btn{
+      border:none;
+      border-radius:999px;
+      padding:12px 18px;
+      font-weight:600;
+      cursor:pointer;
+      text-decoration:none;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      font-size:14px;
+      transition:transform var(--transition), box-shadow var(--transition), background var(--transition);
+    }
+    .btn-primary{
+      background:linear-gradient(135deg, var(--primary), var(--primary2));
+      color:#051026;
+      box-shadow:0 12px 26px rgba(59,130,246,.35);
+    }
+    .btn-primary:hover{transform:translateY(-2px);box-shadow:0 16px 32px rgba(59,130,246,.45);}
+    .btn-ghost{
+      background:rgba(255,255,255,.06);
+      color:#dfe8ff;
+      border:1px solid rgba(255,255,255,.14);
+    }
+    .btn-ghost:hover{transform:translateY(-2px);box-shadow:var(--glow);}
+
+    .status{
+      margin-bottom:12px;
+      padding:12px 14px;
+      border-radius:14px;
+      font-size:14px;
+      display:none;
+      white-space:pre-wrap;
+    }
+    .status.ok{
+      display:block;
+      background:rgba(61,220,151,.1);
+      color:#bdf5dc;
+      border:1px solid rgba(61,220,151,.2);
+    }
+    .status.error{
+      display:block;
+      background:rgba(255,95,122,.1);
+      color:#ffd6de;
+      border:1px solid rgba(255,95,122,.2);
+    }
+    .status.warn{
+      display:block;
+      background:rgba(255,184,77,.12);
+      color:#ffe1b3;
+      border:1px solid rgba(255,184,77,.2);
+    }
+
+    .helper{
+      margin-top:18px;
+      font-size:13px;
+      color:var(--muted);
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header class="nav">
+      <a class="brand" href="../">BLACKOUTS</a>
+      <a href="../">Voltar para loja</a>
+    </header>
+
+    <main class="container">
+      <div class="card">
+        <h1>Area do cliente</h1>
+        <p>Entre com o e-mail usado na compra para acessar seu painel.</p>
+
+        <div id="status" class="status"></div>
+
+        <label for="email">E-mail</label>
+        <input id="email" type="email" placeholder="voce@email.com">
+
+        <label for="senha">Senha</label>
+        <input id="senha" type="password" placeholder="Sua senha">
+
+        <div class="actions">
+          <button class="btn btn-primary" id="btnEntrar">Entrar</button>
+          <a class="btn btn-ghost" href="../">Voltar</a>
+        </div>
+
+        <div class="helper">
+          Ainda nao criou senha? Verifique o e-mail enviado apos a compra e clique no link de criacao.
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="../config.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    const CONFIG = window.__CONFIG__ || {}
+    const SUPABASE_URL = CONFIG.SUPABASE_URL || ""
+    const SUPABASE_ANON_KEY = CONFIG.SUPABASE_ANON_KEY || ""
+
+    const supabaseClient = window.supabase?.createClient
+      ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+        auth: {
+          persistSession: true,
+          autoRefreshToken: true,
+          detectSessionInUrl: true
+        }
+      })
+      : null
+
+    const statusEl = document.getElementById("status")
+    const emailEl = document.getElementById("email")
+    const senhaEl = document.getElementById("senha")
+    const btnEntrar = document.getElementById("btnEntrar")
+
+    function mostrarStatus(texto, tipo) {
+      statusEl.className = "status " + tipo
+      statusEl.textContent = texto
+    }
+
+    function limparStatus() {
+      statusEl.className = "status"
+      statusEl.textContent = ""
+    }
+
+    async function verificarSessaoAtual() {
+      if (!supabaseClient || !SUPABASE_URL || !SUPABASE_ANON_KEY) {
+        mostrarStatus("Configure o Supabase em config.js.", "warn")
+        return
+      }
+
+      const { data } = await supabaseClient.auth.getSession()
+      if (data?.session) {
+        window.location.href = "../painel/"
+      }
+    }
+
+    async function entrar() {
+      limparStatus()
+
+      const email = emailEl.value.trim()
+      const senha = senhaEl.value.trim()
+
+      if (!email || !senha) {
+        mostrarStatus("Preencha e-mail e senha.", "error")
+        return
+      }
+
+      if (!supabaseClient || !SUPABASE_URL || !SUPABASE_ANON_KEY) {
+        mostrarStatus("Configure o Supabase em config.js.", "error")
+        return
+      }
+
+      const { data, error } = await supabaseClient.auth.signInWithPassword({
+        email,
+        password: senha
+      })
+
+      if (error) {
+        mostrarStatus(error.message || "Falha no login.", "error")
+        return
+      }
+
+      if (data?.session) {
+        mostrarStatus("Login realizado. Redirecionando...", "ok")
+        setTimeout(() => {
+          window.location.href = "../painel/"
+        }, 800)
+      }
+    }
+
+    btnEntrar.addEventListener("click", entrar)
+    verificarSessaoAtual()
+  </script>
+</body>
+</html>

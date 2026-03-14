@@ -1,0 +1,446 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<title>Blackouts | Checkout</title>
+<style>
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap");
+
+:root{
+  --bg:#02040a;
+  --bg2:#060914;
+  --panel:rgba(8,12,20,.72);
+  --panel-strong:rgba(8,12,20,.86);
+  --line:rgba(59,130,246,.28);
+  --text:#f5f7ff;
+  --muted:#9aa8cc;
+  --primary:#3b82f6;
+  --primary2:#63b3ff;
+  --radius:16px;
+  --glow:0 0 18px rgba(59,130,246,.35);
+  --transition:0.25s ease;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{
+  min-height:100vh;
+  font-family:"Inter", system-ui, sans-serif;
+  color:var(--text);
+  background:
+    radial-gradient(circle at 20% 10%, rgba(59,130,246,.18), transparent 32%),
+    radial-gradient(circle at 80% 15%, rgba(59,130,246,.12), transparent 38%),
+    linear-gradient(180deg, var(--bg), var(--bg2));
+}
+body::before{
+  content:"";
+  position:fixed;
+  inset:0;
+  background:
+    radial-gradient(rgba(255,255,255,.08) 1px, transparent 1px),
+    radial-gradient(rgba(255,255,255,.04) 1px, transparent 1px);
+  background-size:140px 140px, 220px 220px;
+  background-position:0 0, 60px 80px;
+  opacity:.25;
+  pointer-events:none;
+}
+.page{position:relative;z-index:1;}
+.container{
+  max-width:720px;
+  margin:0 auto;
+  padding:28px 24px 60px;
+}
+
+.nav{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:14px 24px;
+  border-radius:999px;
+  background:rgba(5,8,16,.55);
+  border:1px solid rgba(255,255,255,.06);
+  backdrop-filter:blur(12px);
+  position:sticky;
+  top:16px;
+  z-index:10;
+}
+.brand{
+  font-weight:800;
+  letter-spacing:.22em;
+  color:#9dd0ff;
+  text-decoration:none;
+  position:relative;
+}
+.brand::before,
+.brand::after{
+  content:"";
+  position:absolute;
+  top:50%;
+  width:70px;
+  height:2px;
+  background:linear-gradient(90deg, transparent, rgba(59,130,246,.9), transparent);
+  box-shadow:0 0 12px rgba(59,130,246,.6);
+}
+.brand::before{right:100%;margin-right:16px;}
+.brand::after{left:100%;margin-left:16px;}
+.nav-links{display:flex;gap:18px;font-size:14px;}
+.nav-links a{color:var(--muted);text-decoration:none;transition:color var(--transition);}
+.nav-links a:hover{color:#dce6ff;}
+
+.card{
+  margin-top:36px;
+  background:var(--panel-strong);
+  border:1px solid rgba(255,255,255,.1);
+  border-radius:var(--radius);
+  padding:26px;
+  box-shadow:0 30px 80px rgba(8,18,40,.45);
+}
+.card h1{font-size:28px;margin-bottom:6px;}
+.card p{color:var(--muted);margin-bottom:18px;}
+
+label{display:block;margin-bottom:8px;color:var(--muted);font-size:13px;}
+input, select{
+  width:100%;
+  padding:14px 16px;
+  border-radius:14px;
+  border:1px solid rgba(255,255,255,.12);
+  background:rgba(255,255,255,.04);
+  color:#fff;
+  outline:none;
+  margin-bottom:14px;
+  font-size:15px;
+}
+select option{color:#00152f;}
+
+.product-info{
+  margin-bottom:16px;
+  padding:14px;
+  border-radius:14px;
+  background:rgba(59,130,246,.12);
+  border:1px solid rgba(59,130,246,.2);
+}
+.product-info strong{display:block;margin-bottom:6px;}
+.product-info span{color:var(--muted);font-size:13px;}
+
+.btn{
+  border:none;
+  border-radius:999px;
+  padding:12px 18px;
+  font-weight:600;
+  cursor:pointer;
+  text-decoration:none;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  font-size:14px;
+  transition:transform var(--transition), box-shadow var(--transition), background var(--transition);
+}
+.btn-primary{
+  background:linear-gradient(135deg, var(--primary), var(--primary2));
+  color:#051026;
+  box-shadow:0 12px 26px rgba(59,130,246,.35);
+}
+.btn-primary:hover{transform:translateY(-2px);box-shadow:0 16px 32px rgba(59,130,246,.45);}
+.btn-ghost{
+  background:rgba(255,255,255,.06);
+  color:#dfe8ff;
+  border:1px solid rgba(255,255,255,.14);
+}
+.btn-ghost:hover{transform:translateY(-2px);box-shadow:var(--glow);}
+
+.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:4px;}
+
+.status{
+  margin-top:10px;
+  padding:12px 14px;
+  border-radius:14px;
+  font-size:14px;
+  display:none;
+  white-space:pre-wrap;
+}
+.status.ok{
+  display:block;
+  background:rgba(61,220,151,.1);
+  color:#bdf5dc;
+  border:1px solid rgba(61,220,151,.2);
+}
+.status.error{
+  display:block;
+  background:rgba(255,95,122,.1);
+  color:#ffd6de;
+  border:1px solid rgba(255,95,122,.2);
+}
+
+.pix-box{
+  margin-top:16px;
+  padding:16px;
+  border-radius:16px;
+  background:rgba(59,130,246,.12);
+  border:1px solid rgba(59,130,246,.2);
+  display:none;
+}
+.pix-box img{
+  width:220px;
+  max-width:100%;
+  display:block;
+  margin:12px auto;
+  background:#fff;
+  padding:8px;
+  border-radius:12px;
+}
+.pix-code{
+  width:100%;
+  min-height:120px;
+  padding:12px;
+  border-radius:12px;
+  border:1px solid rgba(255,255,255,.12);
+  background:rgba(255,255,255,.04);
+  color:#fff;
+  margin-top:10px;
+}
+.copy-btn{margin-top:10px;}
+.link-entrega{
+  margin-top:14px;
+  padding:14px;
+  border-radius:14px;
+  background:rgba(61,220,151,.08);
+  border:1px solid rgba(61,220,151,.18);
+  display:none;
+  word-break:break-word;
+}
+.link-entrega a{color:#bdf5dc;}
+
+.footer{margin-top:50px;text-align:center;color:var(--muted);font-size:13px;}
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="container">
+    <header class="nav">
+      <a class="brand" href="../">BLACKOUTS</a>
+      <div class="nav-links">
+        <a href="../produtos/">Produtos</a>
+        <a href="../#suporte">Suporte</a>
+      </div>
+      <a class="btn btn-ghost" href="../entrar/">Entrar</a>
+    </header>
+
+    <div class="card">
+      <h1>Checkout</h1>
+      <p>Finalize seu pedido e gere o Pix de pagamento.</p>
+
+      <div id="productInfo" class="product-info">
+        <strong>Selecione um produto</strong>
+        <span>Escolha abaixo para continuar.</span>
+      </div>
+
+      <label for="produtoSelect">Produto</label>
+      <select id="produtoSelect"></select>
+
+      <label for="nomeCliente">Seu nome</label>
+      <input id="nomeCliente" type="text" placeholder="Seu nome">
+
+      <label for="emailCliente">Seu e-mail</label>
+      <input id="emailCliente" type="email" placeholder="Seu e-mail">
+
+      <div class="actions">
+        <button class="btn btn-primary" id="btnGerar">Gerar Pix</button>
+        <a class="btn btn-ghost" href="../produtos/">Voltar</a>
+      </div>
+
+      <div id="pedidoStatus" class="status"></div>
+
+      <div id="pixBox" class="pix-box">
+        <strong>Pagamento Pix gerado</strong>
+        <img id="pixQrImage" alt="QR Code Pix">
+        <div style="margin-top:10px;">Copia e cola Pix:</div>
+        <textarea id="pixCode" class="pix-code" readonly></textarea>
+        <button class="btn btn-primary copy-btn" id="btnCopiar">Copiar codigo Pix</button>
+        <div style="margin-top:12px; color:#aab5d6; font-size:13px;">
+          A conta sera liberada somente apos confirmacao do pagamento.
+        </div>
+      </div>
+
+      <div id="linkEntrega" class="link-entrega"></div>
+    </div>
+
+    <div class="footer">© Blackouts — loja digital com identidade premium</div>
+  </div>
+</div>
+
+<script src="../config.js"></script>
+<script>
+const CONFIG = window.__CONFIG__ || {}
+const API_URL = CONFIG.API_URL || "https://blackouts-site.onrender.com"
+
+const produtoSelect = document.getElementById("produtoSelect")
+const productInfo = document.getElementById("productInfo")
+const nomeClienteEl = document.getElementById("nomeCliente")
+const emailClienteEl = document.getElementById("emailCliente")
+const pedidoStatusEl = document.getElementById("pedidoStatus")
+const pixBox = document.getElementById("pixBox")
+const pixQrImage = document.getElementById("pixQrImage")
+const pixCode = document.getElementById("pixCode")
+const linkEntrega = document.getElementById("linkEntrega")
+
+let produtosCache = []
+
+function mostrarStatusPedido(texto, tipo){
+  pedidoStatusEl.className = "status " + tipo
+  pedidoStatusEl.textContent = texto
+}
+
+function limparStatusPedido(){
+  pedidoStatusEl.className = "status"
+  pedidoStatusEl.textContent = ""
+}
+
+function resetPix(){
+  pixBox.style.display = "none"
+  pixQrImage.src = ""
+  pixCode.value = ""
+  linkEntrega.style.display = "none"
+  linkEntrega.innerHTML = ""
+}
+
+function formatarMoeda(valor){
+  return Number(valor || 0).toLocaleString("pt-BR", {
+    style: "currency",
+    currency: "BRL"
+  })
+}
+
+function atualizarInfoProduto(produto){
+  if (!produto) {
+    productInfo.innerHTML = "<strong>Selecione um produto</strong><span>Escolha abaixo para continuar.</span>"
+    return
+  }
+
+  const estoque = produto.stock_available ?? produto.estoque ?? 0
+
+  productInfo.innerHTML = `
+    <strong>${produto.name ?? produto.nome ?? "Produto"}</strong>
+    <span>${formatarMoeda(produto.price ?? produto.preco ?? 0)} · Estoque: ${estoque}</span>
+  `
+}
+
+async function carregarProdutos(){
+  try{
+    const res = await fetch(API_URL + "/produtos")
+    const produtos = await res.json()
+    produtosCache = Array.isArray(produtos) ? produtos : []
+
+    if (!produtosCache.length) {
+      produtoSelect.innerHTML = "<option value=''>Nenhum produto disponivel</option>"
+      atualizarInfoProduto(null)
+      return
+    }
+
+    produtoSelect.innerHTML = produtosCache
+      .map((produto) => `<option value="${produto.id}">${produto.name ?? produto.nome ?? "Produto"}</option>`)
+      .join("")
+
+    const url = new URL(window.location.href)
+    const produtoParam = url.searchParams.get("produto")
+
+    if (produtoParam && produtosCache.find((p) => String(p.id) === String(produtoParam))) {
+      produtoSelect.value = produtoParam
+    }
+
+    atualizarInfoProduto(produtosCache.find((p) => String(p.id) === String(produtoSelect.value)))
+  }catch(e){
+    produtoSelect.innerHTML = "<option value=''>Erro ao carregar</option>"
+  }
+}
+
+async function enviarPedido(){
+  limparStatusPedido()
+  resetPix()
+
+  const produto_id = Number(produtoSelect.value)
+  const nome_cliente = nomeClienteEl.value.trim()
+  const email_cliente = emailClienteEl.value.trim()
+
+  if(!produto_id || !nome_cliente || !email_cliente){
+    mostrarStatusPedido("Preencha produto, nome e email.", "error")
+    return
+  }
+
+  const produto = produtosCache.find((p) => String(p.id) === String(produto_id))
+  const estoque = produto?.stock_available ?? produto?.estoque ?? 0
+  if (estoque <= 0) {
+    mostrarStatusPedido("Produto sem estoque disponivel.", "error")
+    return
+  }
+
+  try{
+    const res = await fetch(API_URL + "/pedidos", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        produto_id,
+        nome_cliente,
+        email_cliente
+      })
+    })
+
+    const dados = await res.json()
+
+    if(!res.ok){
+      mostrarStatusPedido(dados.erro || "Erro ao gerar pedido Pix.", "error")
+      return
+    }
+
+    mostrarStatusPedido("Pix gerado com sucesso. Faça o pagamento e acompanhe a entrega.", "ok")
+
+    if(dados.pix){
+      if(dados.pix.qr_code_base64){
+        pixQrImage.src = "data:image/png;base64," + dados.pix.qr_code_base64
+      }
+
+      pixCode.value = dados.pix.qr_code || ""
+      pixBox.style.display = "block"
+    }
+
+    if(dados.entrega_url){
+      linkEntrega.innerHTML = `
+        <strong>Link de acompanhamento da entrega:</strong><br><br>
+        <a href="${dados.entrega_url}" target="_blank">${dados.entrega_url}</a>
+      `
+      linkEntrega.style.display = "block"
+    }
+
+  }catch(e){
+    mostrarStatusPedido("Erro ao conectar com a API.", "error")
+  }
+}
+
+async function copiarPix(){
+  const texto = pixCode.value
+
+  if(!texto){
+    return
+  }
+
+  try{
+    await navigator.clipboard.writeText(texto)
+    alert("Codigo Pix copiado.")
+  }catch(e){
+    alert("Nao foi possivel copiar o codigo.")
+  }
+}
+
+produtoSelect.addEventListener("change", () => {
+  const produto = produtosCache.find((p) => String(p.id) === String(produtoSelect.value))
+  atualizarInfoProduto(produto)
+})
+
+document.getElementById("btnGerar").addEventListener("click", enviarPedido)
+document.getElementById("btnCopiar").addEventListener("click", copiarPix)
+
+carregarProdutos()
+</script>
+</body>
+</html>

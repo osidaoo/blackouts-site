@@ -81,7 +81,15 @@ function gerarToken(usuario) {
   )
 }
 
-function autenticarToken(req, res, next) {
+function obterRoleUsuario(user) {
+  return String(
+    user?.user_metadata?.role ||
+    user?.app_metadata?.role ||
+    ""
+  ).toLowerCase()
+}
+
+async function autenticarSupabase(req, res, next) {
   const authHeader = req.headers.authorization
 
   if (!authHeader) {
@@ -94,20 +102,57 @@ function autenticarToken(req, res, next) {
     return res.status(401).json({ erro: "Token inválido" })
   }
 
-  try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET)
-    req.usuario = decoded
-    next()
-  } catch {
+  const { data, error } = await supabase.auth.getUser(token)
+
+  if (error || !data?.user) {
     return res.status(401).json({ erro: "Token expirado ou inválido" })
   }
+
+  req.usuario = {
+    id: data.user.id,
+    email: data.user.email,
+    papel: obterRoleUsuario(data.user)
+  }
+  req.usuarioRaw = data.user
+  next()
 }
 
-function somenteAdmin(req, res, next) {
+function somenteAdminSupabase(req, res, next) {
   const papel = String(req.usuario?.papel || "").toLowerCase()
 
   if (papel !== "administrador" && papel !== "admin") {
     return res.status(403).json({ erro: "Acesso permitido apenas para administrador" })
+  }
+
+  next()
+}
+
+async function somenteClienteSupabase(req, res, next) {
+  const papel = String(req.usuario?.papel || "").toLowerCase()
+
+  if (papel === "admin" || papel === "administrador" || papel === "customer") {
+    return next()
+  }
+
+  const email = normalizarEmail(req.usuario?.email || "")
+
+  if (!email) {
+    return res.status(403).json({ erro: "Acesso permitido apenas para clientes" })
+  }
+
+  const { data, error } = await supabase
+    .from("orders")
+    .select("id")
+    .ilike("customer_email", email)
+    .eq("payment_status", "paid")
+    .limit(1)
+
+  if (error) {
+    return res.status(500).json({ erro: "Erro ao validar cliente" })
+  }
+
+  if (!data || !data.length) {
+    return res.status(403).json({ erro: "Acesso permitido apenas para clientes" })
   }
 
   next()
@@ -312,6 +357,54 @@ async function registrarAlertaSemEstoque({ orderId, paymentId, productId, email 
   }
 }
 
+async function convidarClienteSeNecessario({ email, nome }) {
+  const emailNormalizado = normalizarEmail(email)
+
+  if (!emailNormalizado) {
+    return
+  }
+
+  if (!supabase?.auth?.admin?.inviteUserByEmail) {
+    console.log("Supabase admin indisponivel para convite.")
+    return
+  }
+
+  try {
+    const { data: usuarioData, error: erroUsuario } = await supabase.auth.admin.getUserByEmail(emailNormalizado)
+
+    if (!erroUsuario && usuarioData?.user) {
+      const roleAtual = obterRoleUsuario(usuarioData.user)
+
+      if (roleAtual !== "customer") {
+        const metadataAtual = usuarioData.user.user_metadata || {}
+        await supabase.auth.admin.updateUserById(usuarioData.user.id, {
+          user_metadata: {
+            ...metadataAtual,
+            role: "customer",
+            name: metadataAtual.name || nome || null
+          }
+        })
+      }
+
+      return
+    }
+
+    const { error: erroConvite } = await supabase.auth.admin.inviteUserByEmail(emailNormalizado, {
+      redirectTo: `${DELIVERY_BASE_URL}/criar-senha`,
+      data: {
+        role: "customer",
+        name: nome || null
+      }
+    })
+
+    if (erroConvite) {
+      console.log("Erro ao convidar cliente:", erroConvite.message)
+    }
+  } catch (error) {
+    console.log("Erro ao convidar cliente:", error)
+  }
+}
+
 app.get("/", (req, res) => {
   res.json({ status: "API Blackouts online" })
 })
@@ -332,51 +425,15 @@ app.get("/produtos", async (req, res) => {
   }
 })
 
-app.post("/login", rateLimitLogin, async (req, res) => {
-  try {
-    const { email, senha } = req.body
-
-    if (!email || !senha) {
-      return res.status(400).json({ erro: "Email e senha são obrigatórios" })
-    }
-
-    const { data, error } = await supabase
-      .from("users")
-      .select("*")
-      .ilike("email", email.trim())
-      .single()
-
-    if (error || !data) {
-      return res.status(401).json({ erro: "Usuário não encontrado" })
-    }
-
-    const senhaValida = await bcrypt.compare(senha, data.password_hash)
-
-    if (!senhaValida) {
-      return res.status(401).json({ erro: "Senha inválida" })
-    }
-
-    const token = gerarToken(data)
-
-    res.json({
-      token,
-      usuario: {
-        id: data.id,
-        nome: data.name,
-        email: data.email,
-        papel: data.role
-      }
-    })
-  } catch (error) {
-    res.status(500).json({ erro: "Erro interno no login" })
-  }
+app.post("/login", rateLimitLogin, (req, res) => {
+  res.status(410).json({ erro: "Login legado desativado. Use o fluxo de autenticação do Supabase." })
 })
 
-app.get("/me", autenticarToken, (req, res) => {
+app.get("/me", autenticarSupabase, (req, res) => {
   res.json({ usuario: req.usuario })
 })
 
-app.get("/admin/dashboard", autenticarToken, somenteAdmin, async (req, res) => {
+app.get("/admin/dashboard", autenticarSupabase, somenteAdminSupabase, async (req, res) => {
   try {
     const { data: produtos, error: erroProdutos } = await supabase
       .from("products")
@@ -427,7 +484,7 @@ app.get("/admin/dashboard", autenticarToken, somenteAdmin, async (req, res) => {
   }
 })
 
-app.get("/admin/produtos", autenticarToken, somenteAdmin, async (req, res) => {
+app.get("/admin/produtos", autenticarSupabase, somenteAdminSupabase, async (req, res) => {
   try {
     const { data, error } = await carregarProdutosComEstoque({ orderBy: "created_at" })
 
@@ -439,7 +496,7 @@ app.get("/admin/produtos", autenticarToken, somenteAdmin, async (req, res) => {
   }
 })
 
-app.post("/admin/produtos", autenticarToken, somenteAdmin, async (req, res) => {
+app.post("/admin/produtos", autenticarSupabase, somenteAdminSupabase, async (req, res) => {
   try {
     const { name, slug, type, price, description, image_url } = req.body
 
@@ -467,7 +524,7 @@ app.post("/admin/produtos", autenticarToken, somenteAdmin, async (req, res) => {
   }
 })
 
-app.put("/admin/produtos/:id", autenticarToken, somenteAdmin, async (req, res) => {
+app.put("/admin/produtos/:id", autenticarSupabase, somenteAdminSupabase, async (req, res) => {
   try {
     const { id } = req.params
     const { name, slug, type, price, description, image_url } = req.body
@@ -497,7 +554,7 @@ app.put("/admin/produtos/:id", autenticarToken, somenteAdmin, async (req, res) =
   }
 })
 
-app.delete("/admin/produtos/:id", autenticarToken, somenteAdmin, async (req, res) => {
+app.delete("/admin/produtos/:id", autenticarSupabase, somenteAdminSupabase, async (req, res) => {
   try {
     const { id } = req.params
 
@@ -514,7 +571,7 @@ app.delete("/admin/produtos/:id", autenticarToken, somenteAdmin, async (req, res
   }
 })
 
-app.get("/admin/pedidos", autenticarToken, somenteAdmin, async (req, res) => {
+app.get("/admin/pedidos", autenticarSupabase, somenteAdminSupabase, async (req, res) => {
   try {
     const { data, error } = await supabase
       .from("orders")
@@ -533,7 +590,7 @@ app.get("/admin/pedidos", autenticarToken, somenteAdmin, async (req, res) => {
   }
 })
 
-app.get("/admin/estoque", autenticarToken, somenteAdmin, async (req, res) => {
+app.get("/admin/estoque", autenticarSupabase, somenteAdminSupabase, async (req, res) => {
   try {
     const produtoFiltro = String(req.query.product_id || req.query.produto || "").trim()
 
@@ -572,7 +629,7 @@ app.get("/admin/estoque", autenticarToken, somenteAdmin, async (req, res) => {
   }
 })
 
-app.post("/admin/estoque", autenticarToken, somenteAdmin, async (req, res) => {
+app.post("/admin/estoque", autenticarSupabase, somenteAdminSupabase, async (req, res) => {
   try {
     const {
       product_id,
@@ -608,7 +665,7 @@ app.post("/admin/estoque", autenticarToken, somenteAdmin, async (req, res) => {
   }
 })
 
-app.put("/admin/estoque/:id", autenticarToken, somenteAdmin, async (req, res) => {
+app.put("/admin/estoque/:id", autenticarSupabase, somenteAdminSupabase, async (req, res) => {
   try {
     const { id } = req.params
     const {
@@ -648,7 +705,7 @@ app.put("/admin/estoque/:id", autenticarToken, somenteAdmin, async (req, res) =>
   }
 })
 
-app.delete("/admin/estoque/:id", autenticarToken, somenteAdmin, async (req, res) => {
+app.delete("/admin/estoque/:id", autenticarSupabase, somenteAdminSupabase, async (req, res) => {
   try {
     const { id } = req.params
 
@@ -662,6 +719,31 @@ app.delete("/admin/estoque/:id", autenticarToken, somenteAdmin, async (req, res)
     res.json({ sucesso: true })
   } catch (error) {
     res.status(500).json({ erro: "Erro ao deletar item de estoque" })
+  }
+})
+
+app.get("/cliente/pedidos", autenticarSupabase, somenteClienteSupabase, async (req, res) => {
+  try {
+    const email = normalizarEmail(req.usuario?.email || "")
+
+    if (!email) {
+      return res.status(400).json({ erro: "Email do cliente não encontrado" })
+    }
+
+    const { data, error } = await supabase
+      .from("orders")
+      .select(`
+        *,
+        order_items (*, products (name))
+      `)
+      .ilike("customer_email", email)
+      .order("created_at", { ascending: false })
+
+    if (error) return res.status(500).json({ erro: error.message })
+
+    res.json(data || [])
+  } catch (error) {
+    res.status(500).json({ erro: "Erro ao buscar pedidos do cliente" })
   }
 })
 
@@ -1053,6 +1135,11 @@ app.post("/webhook/mercadopago", async (req, res) => {
         email: order.customer_email || order.email_cliente || order.cliente_email || null
       })
 
+      await convidarClienteSeNecessario({
+        email: order.customer_email || order.email_cliente || order.cliente_email || null,
+        nome: order.customer_name || order.nome_cliente || order.cliente_nome || null
+      })
+
       return res.status(200).send("ok")
     }
 
@@ -1103,6 +1190,11 @@ app.post("/webhook/mercadopago", async (req, res) => {
     }
 
     console.log("CONTA ENTREGUE:", contaDisponivel.content_login)
+
+    await convidarClienteSeNecessario({
+      email: order.customer_email || order.email_cliente || order.cliente_email || null,
+      nome: order.customer_name || order.nome_cliente || order.cliente_nome || null
+    })
 
     return res.status(200).send("ok")
   } catch (error) {
