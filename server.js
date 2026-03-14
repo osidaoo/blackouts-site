@@ -21,7 +21,7 @@ const MP_ACCESS_TOKEN = process.env.MP_ACCESS_TOKEN
 
 function gerarToken(usuario) {
   return jwt.sign(
-    { id: usuario.id, papel: usuario.papel },
+    { id: usuario.id, papel: usuario.role },
     process.env.JWT_SECRET,
     { expiresIn: "7d" }
   )
@@ -68,6 +68,15 @@ function obterIp(req) {
   )
 }
 
+function normalizarStatusEstoque(status) {
+  const valor = String(status || "").toLowerCase()
+
+  if (["available", "disponivel", "ativo", "livre"].includes(valor)) return "available"
+  if (["sold", "vendida", "vendido", "entregue", "used", "usado"].includes(valor)) return "sold"
+
+  return valor
+}
+
 app.get("/", (req, res) => {
   res.json({ status: "API Blackouts online" })
 })
@@ -79,13 +88,14 @@ app.get("/teste-login", (req, res) => {
 app.get("/produtos", async (req, res) => {
   try {
     const { data, error } = await supabase
-      .from("produtos")
+      .from("products")
       .select("*")
-      .order("id", { ascending: true })
+      .order("name", { ascending: true })
 
     if (error) return res.status(500).json({ erro: error.message })
-    res.json(data)
-  } catch {
+
+    res.json(data || [])
+  } catch (error) {
     res.status(500).json({ erro: "Erro ao buscar produtos" })
   }
 })
@@ -99,7 +109,7 @@ app.post("/login", async (req, res) => {
     }
 
     const { data, error } = await supabase
-      .from("usuarios_admin")
+      .from("users")
       .select("*")
       .ilike("email", email.trim())
       .single()
@@ -108,7 +118,7 @@ app.post("/login", async (req, res) => {
       return res.status(401).json({ erro: "Usuário não encontrado" })
     }
 
-    const senhaValida = await bcrypt.compare(senha, data.senha_hash)
+    const senhaValida = await bcrypt.compare(senha, data.password_hash)
 
     if (!senhaValida) {
       return res.status(401).json({ erro: "Senha inválida" })
@@ -120,12 +130,12 @@ app.post("/login", async (req, res) => {
       token,
       usuario: {
         id: data.id,
-        nome: data.nome,
+        nome: data.name,
         email: data.email,
-        papel: data.papel
+        papel: data.role
       }
     })
-  } catch {
+  } catch (error) {
     res.status(500).json({ erro: "Erro interno no login" })
   }
 })
@@ -136,26 +146,40 @@ app.get("/me", autenticarToken, (req, res) => {
 
 app.get("/admin/dashboard", autenticarToken, somenteAdmin, async (req, res) => {
   try {
-    const { data: produtos, error: erroProdutos } = await supabase.from("produtos").select("*")
+    const { data: produtos, error: erroProdutos } = await supabase
+      .from("products")
+      .select("*")
+
     if (erroProdutos) return res.status(500).json({ erro: erroProdutos.message })
 
-    const { data: pedidos, error: erroPedidos } = await supabase.from("pedidos").select("*")
+    const { data: pedidos, error: erroPedidos } = await supabase
+      .from("orders")
+      .select("*")
+
     if (erroPedidos) return res.status(500).json({ erro: erroPedidos.message })
+
+    const { data: estoque, error: erroEstoque } = await supabase
+      .from("inventory_items")
+      .select("*")
+
+    if (erroEstoque) return res.status(500).json({ erro: erroEstoque.message })
 
     const hoje = new Date()
     const inicioHoje = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate())
 
     const pedidosLista = pedidos || []
     const produtosLista = produtos || []
+    const estoqueLista = estoque || []
 
     const pedidosHoje = pedidosLista.filter((pedido) => {
-      if (!pedido.criado_em) return false
-      return new Date(pedido.criado_em) >= inicioHoje
+      if (!pedido.created_at) return false
+      return new Date(pedido.created_at) >= inicioHoje
     })
 
-    const faturamentoTotal = pedidosLista.reduce((total, pedido) => total + Number(pedido.preco || 0), 0)
-    const faturamentoHoje = pedidosHoje.reduce((total, pedido) => total + Number(pedido.preco || 0), 0)
-    const estoqueTotal = produtosLista.reduce((total, produto) => total + Number(produto.estoque || 0), 0)
+    const faturamentoTotal = pedidosLista.reduce((total, pedido) => total + Number(pedido.total || 0), 0)
+    const faturamentoHoje = pedidosHoje.reduce((total, pedido) => total + Number(pedido.total || 0), 0)
+
+    const estoqueDisponivel = estoqueLista.filter((item) => normalizarStatusEstoque(item.status) === "available").length
 
     res.json({
       pedidos_totais: pedidosLista.length,
@@ -163,39 +187,52 @@ app.get("/admin/dashboard", autenticarToken, somenteAdmin, async (req, res) => {
       pedidos_hoje: pedidosHoje.length,
       faturamento_hoje: faturamentoHoje,
       produtos_totais: produtosLista.length,
-      estoque_total: estoqueTotal
+      estoque_disponivel: estoqueDisponivel
     })
-  } catch {
+  } catch (error) {
     res.status(500).json({ erro: "Erro ao carregar dashboard" })
   }
 })
 
 app.get("/admin/produtos", autenticarToken, somenteAdmin, async (req, res) => {
   try {
-    const { data, error } = await supabase.from("produtos").select("*").order("id", { ascending: true })
+    const { data, error } = await supabase
+      .from("products")
+      .select("*")
+      .order("created_at", { ascending: true })
+
     if (error) return res.status(500).json({ erro: error.message })
-    res.json(data)
-  } catch {
+
+    res.json(data || [])
+  } catch (error) {
     res.status(500).json({ erro: "Erro ao buscar produtos do admin" })
   }
 })
 
 app.post("/admin/produtos", autenticarToken, somenteAdmin, async (req, res) => {
   try {
-    const { nome, preco, estoque } = req.body
+    const { name, slug, type, price, description, image_url } = req.body
 
-    if (!nome || preco === undefined || estoque === undefined) {
-      return res.status(400).json({ erro: "Nome, preço e estoque são obrigatórios" })
+    if (!name || price === undefined) {
+      return res.status(400).json({ erro: "Nome e preço são obrigatórios" })
     }
 
     const { data, error } = await supabase
-      .from("produtos")
-      .insert([{ nome, preco: Number(preco), estoque: Number(estoque) }])
+      .from("products")
+      .insert([{
+        name,
+        slug: slug || null,
+        type: type || "account",
+        price: Number(price),
+        description: description || null,
+        image_url: image_url || null
+      }])
       .select()
 
     if (error) return res.status(500).json({ erro: error.message })
+
     res.json(data)
-  } catch {
+  } catch (error) {
     res.status(500).json({ erro: "Erro ao criar produto" })
   }
 })
@@ -203,21 +240,29 @@ app.post("/admin/produtos", autenticarToken, somenteAdmin, async (req, res) => {
 app.put("/admin/produtos/:id", autenticarToken, somenteAdmin, async (req, res) => {
   try {
     const { id } = req.params
-    const { nome, preco, estoque } = req.body
+    const { name, slug, type, price, description, image_url } = req.body
 
-    if (!nome || preco === undefined || estoque === undefined) {
-      return res.status(400).json({ erro: "Nome, preço e estoque são obrigatórios" })
+    if (!name || price === undefined) {
+      return res.status(400).json({ erro: "Nome e preço são obrigatórios" })
     }
 
     const { data, error } = await supabase
-      .from("produtos")
-      .update({ nome, preco: Number(preco), estoque: Number(estoque) })
+      .from("products")
+      .update({
+        name,
+        slug: slug || null,
+        type: type || "account",
+        price: Number(price),
+        description: description || null,
+        image_url: image_url || null
+      })
       .eq("id", id)
       .select()
 
     if (error) return res.status(500).json({ erro: error.message })
+
     res.json(data)
-  } catch {
+  } catch (error) {
     res.status(500).json({ erro: "Erro ao atualizar produto" })
   }
 })
@@ -225,10 +270,16 @@ app.put("/admin/produtos/:id", autenticarToken, somenteAdmin, async (req, res) =
 app.delete("/admin/produtos/:id", autenticarToken, somenteAdmin, async (req, res) => {
   try {
     const { id } = req.params
-    const { error } = await supabase.from("produtos").delete().eq("id", id)
+
+    const { error } = await supabase
+      .from("products")
+      .delete()
+      .eq("id", id)
+
     if (error) return res.status(500).json({ erro: error.message })
+
     res.json({ sucesso: true })
-  } catch {
+  } catch (error) {
     res.status(500).json({ erro: "Erro ao deletar produto" })
   }
 })
@@ -236,13 +287,18 @@ app.delete("/admin/produtos/:id", autenticarToken, somenteAdmin, async (req, res
 app.get("/admin/pedidos", autenticarToken, somenteAdmin, async (req, res) => {
   try {
     const { data, error } = await supabase
-      .from("pedidos")
-      .select("*")
-      .order("criado_em", { ascending: false })
+      .from("orders")
+      .select(`
+        *,
+        order_items (*),
+        payments (*)
+      `)
+      .order("created_at", { ascending: false })
 
     if (error) return res.status(500).json({ erro: error.message })
-    res.json(data)
-  } catch {
+
+    res.json(data || [])
+  } catch (error) {
     res.status(500).json({ erro: "Erro ao buscar pedidos" })
   }
 })
@@ -256,8 +312,12 @@ app.post("/pedidos", async (req, res) => {
       return res.status(400).json({ erro: "Produto, nome e email são obrigatórios" })
     }
 
+    if (!MP_ACCESS_TOKEN) {
+      return res.status(500).json({ erro: "Mercado Pago não configurado" })
+    }
+
     const { data: produto, error: erroProduto } = await supabase
-      .from("produtos")
+      .from("products")
       .select("*")
       .eq("id", produto_id)
       .single()
@@ -266,27 +326,38 @@ app.post("/pedidos", async (req, res) => {
       return res.status(404).json({ erro: "Produto não encontrado" })
     }
 
-    const { data: pedidoInserido, error: erroPedido } = await supabase
-      .from("pedidos")
+    const { data: orderInserida, error: erroOrder } = await supabase
+      .from("orders")
       .insert([{
-        produto_id: produto.id,
-        produto_nome: produto.nome,
-        preco: Number(produto.preco),
-        nome_cliente,
-        email_cliente,
-        ip_cliente,
-        status: "aguardando_pagamento"
+        user_id: null,
+        status: "pending",
+        total: Number(produto.price),
+        payment_status: "pending"
       }])
       .select()
+      .single()
 
-    if (erroPedido || !pedidoInserido || !pedidoInserido[0]) {
-      return res.status(500).json({ erro: erroPedido?.message || "Erro ao criar pedido" })
+    if (erroOrder || !orderInserida) {
+      return res.status(500).json({ erro: erroOrder?.message || "Erro ao criar order" })
     }
 
-    const pedido = pedidoInserido[0]
+    const order = orderInserida
 
-    if (!MP_ACCESS_TOKEN) {
-      return res.status(500).json({ erro: "Mercado Pago não configurado" })
+    const { data: orderItemInserido, error: erroOrderItem } = await supabase
+      .from("order_items")
+      .insert([{
+        order_id: order.id,
+        product_id: produto.id,
+        price: Number(produto.price),
+        quantity: 1,
+        delivery_status: "pending",
+        delivered_content: null
+      }])
+      .select()
+      .single()
+
+    if (erroOrderItem || !orderItemInserido) {
+      return res.status(500).json({ erro: erroOrderItem?.message || "Erro ao criar item do pedido" })
     }
 
     const mpResponse = await fetch("https://api.mercadopago.com/v1/payments", {
@@ -294,18 +365,25 @@ app.post("/pedidos", async (req, res) => {
       headers: {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${MP_ACCESS_TOKEN}`,
-        "X-Idempotency-Key": `pedido-${pedido.id}-${Date.now()}`
+        "X-Idempotency-Key": `order-${order.id}-${Date.now()}`
       },
       body: JSON.stringify({
-        transaction_amount: Number(produto.preco),
-        description: produto.nome,
+        transaction_amount: Number(produto.price),
+        description: produto.name,
         payment_method_id: "pix",
         notification_url: "https://blackouts-site.onrender.com/webhook/mercadopago",
+        external_reference: String(order.id),
         payer: {
           email: email_cliente,
           first_name: nome_cliente
         },
-        external_reference: String(pedido.id)
+        metadata: {
+          order_id: String(order.id),
+          product_id: String(produto.id),
+          nome_cliente,
+          email_cliente,
+          ip_cliente
+        }
       })
     })
 
@@ -322,15 +400,13 @@ app.post("/pedidos", async (req, res) => {
     const qrCodeBase64 = mpData?.point_of_interaction?.transaction_data?.qr_code_base64 || null
 
     const { error: erroPagamento } = await supabase
-      .from("pagamentos")
+      .from("payments")
       .insert([{
-        pedido_id: pedido.id,
-        mp_payment_id: String(mpData.id),
+        order_id: order.id,
+        provider: "mercadopago",
+        provider_payment_id: String(mpData.id),
         status: mpData.status || "pending",
-        qr_code: qrCode,
-        qr_code_base64: qrCodeBase64,
-        valor: Number(produto.preco),
-        detalhe_status: mpData.status_detail || null
+        amount: Number(produto.price)
       }])
 
     if (erroPagamento) {
@@ -339,65 +415,76 @@ app.post("/pedidos", async (req, res) => {
 
     res.json({
       sucesso: true,
-      pedido_id: pedido.id,
+      pedido_id: order.id,
       pagamento_id: mpData.id,
       status: mpData.status,
       pix: {
         qr_code: qrCode,
         qr_code_base64: qrCodeBase64
       },
-      entrega_url: `https://blackouts-site.vercel.app/entrega.html?pedido=${pedido.id}&email=${encodeURIComponent(email_cliente)}`
+      entrega_url: `https://blackouts-site.vercel.app/entrega.html?pedido=${order.id}&email=${encodeURIComponent(email_cliente)}`
     })
-  } catch {
+  } catch (error) {
+    console.log("Erro ao criar pedido com PIX:", error)
     res.status(500).json({ erro: "Erro ao criar pedido com PIX" })
   }
 })
 
 app.get("/pedido-status", async (req, res) => {
   try {
-    const pedidoId = Number(req.query.pedido)
-    const email = String(req.query.email || "").trim().toLowerCase()
+    const pedidoId = String(req.query.pedido || "").trim()
 
-    if (!pedidoId || !email) {
-      return res.status(400).json({ erro: "Pedido e email são obrigatórios" })
+    if (!pedidoId) {
+      return res.status(400).json({ erro: "Pedido é obrigatório" })
     }
 
-    const { data: pedido, error: erroPedido } = await supabase
-      .from("pedidos")
+    const { data: order, error: erroOrder } = await supabase
+      .from("orders")
       .select("*")
       .eq("id", pedidoId)
-      .ilike("email_cliente", email)
       .single()
 
-    if (erroPedido || !pedido) {
+    if (erroOrder || !order) {
       return res.status(404).json({ erro: "Pedido não encontrado" })
+    }
+
+    const { data: orderItem, error: erroOrderItem } = await supabase
+      .from("order_items")
+      .select(`
+        *,
+        products (*)
+      `)
+      .eq("order_id", order.id)
+      .limit(1)
+      .single()
+
+    if (erroOrderItem || !orderItem) {
+      return res.status(404).json({ erro: "Item do pedido não encontrado" })
     }
 
     let entrega = null
 
-    if (pedido.conta_entregue_id) {
-      const { data: conta } = await supabase
-        .from("contas_digitais")
-        .select("id, login, senha, status")
-        .eq("id", pedido.conta_entregue_id)
-        .single()
-
-      if (conta) entrega = conta
+    if (orderItem.delivered_content) {
+      try {
+        entrega = JSON.parse(orderItem.delivered_content)
+      } catch {
+        entrega = { conteudo: orderItem.delivered_content }
+      }
     }
 
     res.json({
       pedido: {
-        id: pedido.id,
-        status: pedido.status,
-        produto_nome: pedido.produto_nome,
-        preco: pedido.preco,
-        criado_em: pedido.criado_em,
-        payment_id_externo: pedido.payment_id_externo || null,
-        entregue_em: pedido.entregue_em || null
+        id: order.id,
+        status: order.status,
+        payment_status: order.payment_status,
+        total: order.total,
+        criado_em: order.created_at,
+        produto_nome: orderItem.products?.name || null,
+        entregue_em: order.payment_status === "paid" ? order.created_at : null
       },
       entrega
     })
-  } catch {
+  } catch (error) {
     res.status(500).json({ erro: "Erro ao consultar pedido" })
   }
 })
@@ -438,94 +525,156 @@ app.post("/webhook/mercadopago", async (req, res) => {
 
     console.log("Pagamento consultado:", pagamento)
 
-    if (pagamento.status !== "approved") {
-      console.log("Pagamento ainda não aprovado:", pagamento.status)
-      return res.status(200).send("pagamento ainda não aprovado")
-    }
+    const orderId = String(
+      pagamento.external_reference ||
+      pagamento.metadata?.order_id ||
+      ""
+    ).trim()
 
-    const pedidoId = Number(pagamento.external_reference)
-
-    if (!pedidoId) {
-      console.log("external_reference inválido:", pagamento.external_reference)
+    if (!orderId) {
+      console.log("orderId não encontrado no pagamento")
       return res.status(200).send("ok")
     }
 
-    const { data: pedido, error: erroPedido } = await supabase
-      .from("pedidos")
+    const { data: paymentRegistro, error: erroBuscaPayment } = await supabase
+      .from("payments")
       .select("*")
-      .eq("id", pedidoId)
+      .eq("provider_payment_id", String(paymentId))
       .single()
 
-    if (erroPedido || !pedido) {
-      console.log("Pedido não encontrado:", erroPedido)
+    if (erroBuscaPayment || !paymentRegistro) {
+      console.log("Pagamento não encontrado na tabela payments:", erroBuscaPayment)
       return res.status(200).send("ok")
-    }
-
-    if (pedido.status === "pago") {
-      console.log("Pedido já estava pago:", pedido.id)
-      return res.status(200).send("ok")
-    }
-
-    const { data: conta, error: erroConta } = await supabase
-      .from("contas_digitais")
-      .select("*")
-      .eq("produto_id", pedido.produto_id)
-      .eq("status", "disponivel")
-      .order("id", { ascending: true })
-      .limit(1)
-      .single()
-
-    if (erroConta || !conta) {
-      console.log("Sem estoque para entregar:", erroConta)
-      return res.status(200).send("ok")
-    }
-
-    const { error: erroAtualizaConta } = await supabase
-      .from("contas_digitais")
-      .update({
-        status: "vendida",
-        pedido_id: pedido.id
-      })
-      .eq("id", conta.id)
-
-    if (erroAtualizaConta) {
-      console.log("Erro ao atualizar conta:", erroAtualizaConta)
-      return res.status(500).send("erro ao atualizar conta")
     }
 
     const agora = new Date().toISOString()
 
-    const { error: erroAtualizaPedido } = await supabase
-      .from("pedidos")
-      .update({
-        status: "pago",
-        conta_entregue_id: conta.id,
-        payment_id_externo: String(paymentId),
-        entregue_em: agora
-      })
-      .eq("id", pedido.id)
+    if (pagamento.status !== "approved") {
+      await supabase
+        .from("payments")
+        .update({
+          status: pagamento.status || "pending"
+        })
+        .eq("id", paymentRegistro.id)
 
-    if (erroAtualizaPedido) {
-      console.log("Erro ao atualizar pedido:", erroAtualizaPedido)
+      await supabase
+        .from("orders")
+        .update({
+          payment_status: pagamento.status || "pending"
+        })
+        .eq("id", orderId)
+
+      console.log("Pagamento ainda não aprovado:", pagamento.status)
+      return res.status(200).send("pagamento ainda não aprovado")
+    }
+
+    const { data: order, error: erroOrder } = await supabase
+      .from("orders")
+      .select("*")
+      .eq("id", orderId)
+      .single()
+
+    if (erroOrder || !order) {
+      console.log("Order não encontrada:", erroOrder)
+      return res.status(200).send("ok")
+    }
+
+    const { data: orderItem, error: erroOrderItem } = await supabase
+      .from("order_items")
+      .select("*")
+      .eq("order_id", order.id)
+      .limit(1)
+      .single()
+
+    if (erroOrderItem || !orderItem) {
+      console.log("Order item não encontrado:", erroOrderItem)
+      return res.status(200).send("ok")
+    }
+
+    if (String(order.payment_status).toLowerCase() === "paid") {
+      console.log("Pedido já estava pago:", order.id)
+      return res.status(200).send("ok")
+    }
+
+    const { data: itemEstoque, error: erroEstoque } = await supabase
+      .from("inventory_items")
+      .select("*")
+      .eq("product_id", orderItem.product_id)
+      .limit(50)
+
+    if (erroEstoque) {
+      console.log("Erro ao buscar estoque:", erroEstoque)
+      return res.status(500).send("erro ao buscar estoque")
+    }
+
+    const contaDisponivel = (itemEstoque || []).find(
+      (item) => normalizarStatusEstoque(item.status) === "available"
+    )
+
+    if (!contaDisponivel) {
+      console.log("Sem estoque para entregar")
+      return res.status(200).send("ok")
+    }
+
+    const deliveredContent = JSON.stringify({
+      tipo: "inventory_item",
+      inventory_item_id: contaDisponivel.id,
+      login: contaDisponivel.content_login,
+      senha: contaDisponivel.content_password,
+      extra: contaDisponivel.content_extra || null
+    })
+
+    const { error: erroAtualizaEstoque } = await supabase
+      .from("inventory_items")
+      .update({
+        status: "sold"
+      })
+      .eq("id", contaDisponivel.id)
+
+    if (erroAtualizaEstoque) {
+      console.log("Erro ao atualizar estoque:", erroAtualizaEstoque)
+      return res.status(500).send("erro ao atualizar estoque")
+    }
+
+    const { error: erroAtualizaOrderItem } = await supabase
+      .from("order_items")
+      .update({
+        delivery_status: "delivered",
+        delivered_content: deliveredContent
+      })
+      .eq("id", orderItem.id)
+
+    if (erroAtualizaOrderItem) {
+      console.log("Erro ao atualizar order_items:", erroAtualizaOrderItem)
+      return res.status(500).send("erro ao atualizar entrega")
+    }
+
+    const { error: erroAtualizaOrder } = await supabase
+      .from("orders")
+      .update({
+        status: "paid",
+        payment_status: "paid"
+      })
+      .eq("id", order.id)
+
+    if (erroAtualizaOrder) {
+      console.log("Erro ao atualizar orders:", erroAtualizaOrder)
       return res.status(500).send("erro ao atualizar pedido")
     }
 
-    const { error: erroAtualizaPagamento } = await supabase
-      .from("pagamentos")
+    const { error: erroAtualizaPayment } = await supabase
+      .from("payments")
       .update({
-        status: "approved",
-        webhook_recebido: true,
-        pago_em: agora,
-        detalhe_status: pagamento.status_detail || null
+        status: "approved"
       })
-      .eq("mp_payment_id", String(paymentId))
+      .eq("id", paymentRegistro.id)
 
-    if (erroAtualizaPagamento) {
-      console.log("Erro ao atualizar pagamento:", erroAtualizaPagamento)
+    if (erroAtualizaPayment) {
+      console.log("Erro ao atualizar payments:", erroAtualizaPayment)
       return res.status(500).send("erro ao atualizar pagamento")
     }
 
-    console.log("CONTA ENTREGUE:", conta.login)
+    console.log("CONTA ENTREGUE:", contaDisponivel.content_login)
 
     return res.status(200).send("ok")
   } catch (error) {
