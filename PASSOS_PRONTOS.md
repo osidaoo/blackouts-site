@@ -29,3 +29,9 @@
 
 1. `SUPABASE_ANON_KEY` e `SUPABASE_URL` nunca devem usar a chave service role no frontend.
 2. Se o dominio principal for `https://blackouts.site`, mantenha esse valor em `CORS_ORIGINS` e `DELIVERY_BASE_URL`.
+
+## 3. Supabase Auth (redirect criar-senha)
+
+1. No Supabase, abra `Authentication` > `URL Configuration`.
+2. Em `Redirect URLs`, adicione: `https://blackouts.site/criar-senha`.
+3. Salve.
