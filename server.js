@@ -8,14 +8,23 @@ const { createClient } = require("@supabase/supabase-js")
 
 const app = express()
 
+const IS_PROD = String(process.env.NODE_ENV || "").toLowerCase() === "production"
+
 const DEFAULT_ORIGINS = [
   "https://blackouts.site",
-  "https://www.blackouts.site",
+  "https://www.blackouts.site"
+]
+
+const DEV_ORIGINS = [
   "http://localhost:3000",
   "http://localhost:5173"
 ]
 
-const ALLOWED_ORIGINS = (process.env.CORS_ORIGINS || DEFAULT_ORIGINS.join(","))
+const BASE_ORIGINS = IS_PROD
+  ? DEFAULT_ORIGINS
+  : DEFAULT_ORIGINS.concat(DEV_ORIGINS)
+
+const ALLOWED_ORIGINS = (process.env.CORS_ORIGINS || BASE_ORIGINS.join(","))
   .split(",")
   .map((origin) => origin.trim())
   .filter(Boolean)
