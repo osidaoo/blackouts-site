@@ -45,6 +45,76 @@ margin-bottom:40px;
 flex-wrap:wrap;
 gap:12px;
 }
+.hero{
+display:grid;
+grid-template-columns:1.1fr .9fr;
+gap:24px;
+align-items:center;
+background:var(--panel);
+border:1px solid var(--line);
+border-radius:var(--radius);
+padding:24px;
+margin-bottom:32px;
+}
+.hero h1{
+font-size:36px;
+line-height:1.1;
+margin-bottom:12px;
+}
+.hero p{
+color:var(--muted);
+font-size:16px;
+line-height:1.6;
+margin-bottom:18px;
+}
+.hero-actions{
+display:flex;
+gap:12px;
+flex-wrap:wrap;
+}
+.btn-inline{
+width:auto;
+display:inline-flex;
+align-items:center;
+justify-content:center;
+padding:12px 20px;
+text-decoration:none;
+}
+.hero-badges{
+display:flex;
+gap:10px;
+flex-wrap:wrap;
+margin-top:14px;
+}
+.badge{
+padding:6px 12px;
+border-radius:999px;
+font-size:12px;
+border:1px solid rgba(255,255,255,.12);
+background:rgba(255,255,255,.04);
+color:#dbe4ff;
+}
+.hero-panel{
+background:rgba(78,161,255,.08);
+border:1px solid rgba(78,161,255,.18);
+border-radius:16px;
+padding:18px;
+}
+.hero-panel h3{
+margin-bottom:10px;
+font-size:18px;
+}
+.hero-panel p{
+margin-bottom:0;
+}
+@media (max-width: 900px){
+.hero{
+grid-template-columns:1fr;
+}
+.hero h1{
+font-size:30px;
+}
+}
 .logo{
 font-size:30px;
 font-weight:900;
@@ -216,6 +286,29 @@ color:#bdf5dc;
       <div class="subtitle">Loja oficial</div>
     </div>
   </div>
+
+  <section class="hero" id="home">
+    <div>
+      <h1>Compra rápida com entrega automática</h1>
+      <p>
+        Escolha sua conta, pague via Pix e receba a liberação assim que o
+        pagamento for aprovado.
+      </p>
+      <div class="hero-actions">
+        <a class="btn btn-inline" href="#produtos">Ver produtos</a>
+        <a class="btn btn-secondary btn-inline" href="entrega.html">Consultar entrega</a>
+      </div>
+      <div class="hero-badges">
+        <span class="badge">Pix instantâneo</span>
+        <span class="badge">Entrega automática</span>
+        <span class="badge">Suporte dedicado</span>
+      </div>
+    </div>
+    <div class="hero-panel">
+      <h3>Como funciona</h3>
+      <p>1) Escolha o produto. 2) Gere o Pix. 3) Após aprovação, a conta aparece no link de entrega.</p>
+    </div>
+  </section>
 
   <h2 style="margin-bottom:20px;">Produtos disponíveis</h2>
 
@@ -401,6 +494,13 @@ async function copiarPix(){
   }catch(e){
     alert("Não foi possível copiar o código.")
   }
+}
+
+if (!window.location.hash) {
+  if ("scrollRestoration" in history) {
+    history.scrollRestoration = "manual"
+  }
+  window.scrollTo(0, 0)
 }
 
 carregarProdutos()
