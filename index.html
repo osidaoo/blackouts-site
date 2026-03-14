@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
@@ -6,166 +6,289 @@
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <title>Blackouts Store</title>
 <style>
+@import url("https://fonts.googleapis.com/css2?family=Oxanium:wght@500;700&family=Sora:wght@300;400;600;700&display=swap");
+
 :root{
---bg:#02040a;
---bg2:#07111f;
---panel:rgba(10,16,30,.92);
---line:rgba(111,168,255,.18);
+--bg:#05070d;
+--bg2:#070b14;
+--panel:rgba(8,12,20,.82);
+--panel-strong:rgba(8,12,20,.92);
+--line:rgba(110,160,255,.25);
 --text:#f5f7ff;
---muted:#aab5d6;
---primary:#4ea1ff;
---primary2:#7cc0ff;
---danger:#ff5f7a;
+--muted:#9aa8cc;
+--primary:#3a7bff;
+--primary2:#4fb3ff;
+--glow:rgba(73,140,255,.3);
 --ok:#3ddc97;
---radius:20px;
+--danger:#ff5f7a;
+--radius:22px;
 }
-*{
-box-sizing:border-box;
-margin:0;
-padding:0;
-font-family:Arial, Helvetica, sans-serif;
-}
+*{box-sizing:border-box;margin:0;padding:0;}
 body{
 min-height:100vh;
-background:
-radial-gradient(circle at top, rgba(78,161,255,.15), transparent 30%),
-linear-gradient(180deg, var(--bg), var(--bg2));
+font-family:"Sora", sans-serif;
 color:var(--text);
-padding:24px;
+background:
+radial-gradient(circle at 20% 10%, rgba(62,120,255,.18), transparent 30%),
+radial-gradient(circle at 80% 20%, rgba(69,184,255,.16), transparent 35%),
+linear-gradient(180deg, var(--bg), var(--bg2));
 }
+body::before{
+content:"";
+position:fixed;
+inset:0;
+background:
+radial-gradient(rgba(255,255,255,.08) 1px, transparent 1px),
+radial-gradient(rgba(255,255,255,.04) 1px, transparent 1px);
+background-size:140px 140px, 220px 220px;
+background-position:0 0, 60px 80px;
+opacity:.25;
+pointer-events:none;
+}
+.page{position:relative;z-index:1;}
 .container{
 max-width:1200px;
-margin:auto;
+margin:0 auto;
+padding:28px 24px 60px;
 }
-.header{
+.nav{
 display:flex;
+align-items:center;
 justify-content:space-between;
-align-items:center;
-margin-bottom:40px;
-flex-wrap:wrap;
-gap:12px;
+padding:18px 24px;
+border-radius:999px;
+background:rgba(5,8,16,.7);
+border:1px solid rgba(255,255,255,.05);
+backdrop-filter:blur(10px);
+position:sticky;
+top:18px;
+z-index:10;
 }
-.hero{
-display:grid;
-grid-template-columns:1.1fr .9fr;
-gap:24px;
-align-items:center;
-background:var(--panel);
-border:1px solid var(--line);
-border-radius:var(--radius);
-padding:24px;
-margin-bottom:32px;
+.brand{
+font-family:"Oxanium", sans-serif;
+font-weight:700;
+letter-spacing:.2em;
+color:#9dd0ff;
 }
-.hero h1{
-font-size:36px;
-line-height:1.1;
-margin-bottom:12px;
-}
-.hero p{
-color:var(--muted);
-font-size:16px;
-line-height:1.6;
-margin-bottom:18px;
-}
-.hero-actions{
+.nav-links{
 display:flex;
-gap:12px;
-flex-wrap:wrap;
+gap:20px;
+font-size:14px;
 }
-.btn-inline{
-width:auto;
+.nav-links a{
+color:var(--muted);
+text-decoration:none;
+transition:.2s ease;
+}
+.nav-links a:hover{color:#dce6ff;}
+.btn{
+border:none;
+border-radius:999px;
+padding:12px 18px;
+font-weight:600;
+cursor:pointer;
+text-decoration:none;
 display:inline-flex;
 align-items:center;
 justify-content:center;
-padding:12px 20px;
-text-decoration:none;
-}
-.hero-badges{
-display:flex;
-gap:10px;
-flex-wrap:wrap;
-margin-top:14px;
-}
-.badge{
-padding:6px 12px;
-border-radius:999px;
-font-size:12px;
-border:1px solid rgba(255,255,255,.12);
-background:rgba(255,255,255,.04);
-color:#dbe4ff;
-}
-.hero-panel{
-background:rgba(78,161,255,.08);
-border:1px solid rgba(78,161,255,.18);
-border-radius:16px;
-padding:18px;
-}
-.hero-panel h3{
-margin-bottom:10px;
-font-size:18px;
-}
-.hero-panel p{
-margin-bottom:0;
-}
-@media (max-width: 900px){
-.hero{
-grid-template-columns:1fr;
-}
-.hero h1{
-font-size:30px;
-}
-}
-.logo{
-font-size:30px;
-font-weight:900;
-letter-spacing:2px;
-color:var(--primary2);
-}
-.subtitle{
-color:var(--muted);
 font-size:14px;
 }
-.grid{
+.btn-primary{
+background:linear-gradient(135deg, var(--primary), var(--primary2));
+color:#061024;
+box-shadow:0 10px 24px rgba(63,118,255,.35);
+}
+.btn-ghost{
+background:rgba(255,255,255,.06);
+color:#dfe8ff;
+border:1px solid rgba(255,255,255,.12);
+}
+.hero{
+margin-top:34px;
+background:linear-gradient(180deg, rgba(9,14,24,.9), rgba(7,10,18,.9));
+border-radius:32px;
+border:1px solid rgba(120,170,255,.25);
+box-shadow:0 40px 120px rgba(8,18,40,.6), 0 0 60px rgba(80,140,255,.18);
+padding:40px 36px;
+}
+.hero-title{
+font-family:"Oxanium", sans-serif;
+font-size:42px;
+letter-spacing:.2em;
+color:#8fbeff;
+text-align:center;
+margin-bottom:16px;
+position:relative;
+}
+.hero-title::after{
+content:"";
+position:absolute;
+left:12%;
+right:12%;
+height:2px;
+background:linear-gradient(90deg, transparent, rgba(96,168,255,.8), transparent);
+top:55%;
+}
+.hero h1{
+font-size:44px;
+line-height:1.1;
+text-align:center;
+margin-bottom:12px;
+}
+.hero p{
+text-align:center;
+color:var(--muted);
+max-width:640px;
+margin:0 auto 22px;
+}
+.hero-tags{
+display:flex;
+justify-content:center;
+flex-wrap:wrap;
+gap:10px;
+margin-bottom:18px;
+}
+.tag{
+padding:8px 14px;
+border-radius:999px;
+background:rgba(255,255,255,.06);
+border:1px solid rgba(255,255,255,.12);
+font-size:12px;
+color:#dce6ff;
+}
+.hero-actions{
+display:flex;
+justify-content:center;
+gap:14px;
+flex-wrap:wrap;
+margin-bottom:26px;
+}
+.hero-stats{
+display:grid;
+grid-template-columns:repeat(3,1fr);
+gap:16px;
+margin-top:10px;
+}
+.stat-card{
+background:rgba(10,16,30,.8);
+border:1px solid rgba(255,255,255,.08);
+border-radius:18px;
+padding:18px;
+text-align:center;
+}
+.stat-card strong{font-size:22px;display:block;margin-bottom:6px;}
+.stat-card span{color:var(--muted);font-size:13px;}
+.section{
+margin-top:60px;
+}
+.section h2{
+font-size:32px;
+margin-bottom:8px;
+}
+.section p{color:var(--muted);}
+.section-head{
+margin-bottom:24px;
+}
+.category-grid{
+display:grid;
+grid-template-columns:repeat(auto-fit,minmax(200px,1fr));
+gap:20px;
+margin-top:24px;
+}
+.category-card{
+background:var(--panel);
+border:1px solid var(--line);
+border-radius:22px;
+padding:22px;
+text-align:center;
+}
+.category-icon{
+width:56px;
+height:56px;
+border-radius:16px;
+margin:0 auto 14px;
+background:rgba(80,140,255,.2);
+box-shadow:0 0 20px rgba(80,140,255,.2);
+font-size:24px;
+display:flex;
+align-items:center;
+justify-content:center;
+}
+.category-card h3{margin-bottom:6px;}
+.products-grid{
 display:grid;
 grid-template-columns:repeat(auto-fit,minmax(250px,1fr));
 gap:20px;
+margin-top:24px;
 }
-.card{
-background:var(--panel);
-border:1px solid var(--line);
-border-radius:var(--radius);
+.product-card{
+background:var(--panel-strong);
+border:1px solid rgba(255,255,255,.1);
+border-radius:20px;
 padding:20px;
+box-shadow:0 20px 50px rgba(5,10,20,.4);
 }
-.card h3{
-margin-bottom:10px;
+.product-card h3{margin-bottom:10px;}
+.product-meta{
+font-size:13px;
+color:var(--muted);
+margin-bottom:12px;
 }
 .price{
 font-size:20px;
-font-weight:bold;
-color:var(--primary2);
-margin-bottom:14px;
+font-weight:700;
+color:#a8d2ff;
+margin-bottom:10px;
 }
 .stock{
 font-size:13px;
 color:var(--muted);
 margin-bottom:14px;
 }
-.btn{
-border:none;
-border-radius:12px;
-padding:12px;
-width:100%;
-cursor:pointer;
-font-weight:700;
-background:linear-gradient(135deg,var(--primary),var(--primary2));
-color:#00152f;
+.loading{color:var(--muted);}
+.support-grid{
+display:grid;
+grid-template-columns:1.1fr .9fr;
+gap:20px;
+margin-top:26px;
 }
-.btn:hover{
-opacity:.9;
+.support-card{
+background:var(--panel);
+border:1px solid var(--line);
+border-radius:22px;
+padding:26px;
 }
-.loading{
+.support-tag{
+font-size:11px;
+letter-spacing:.2em;
+text-transform:uppercase;
+color:#8bbcff;
+margin-bottom:12px;
+display:inline-block;
+}
+.support-card h3{
+font-size:28px;
+margin-bottom:12px;
+}
+.support-card p{
 color:var(--muted);
+margin-bottom:18px;
 }
+.trust-card{
+background:var(--panel-strong);
+border:1px solid rgba(255,255,255,.1);
+border-radius:22px;
+padding:22px;
+}
+.trust-item{
+background:rgba(255,255,255,.04);
+border:1px solid rgba(255,255,255,.08);
+border-radius:16px;
+padding:16px;
+margin-bottom:14px;
+}
+.trust-item:last-child{margin-bottom:0;}
+.trust-item strong{display:block;font-size:20px;color:#8bbcff;margin-bottom:4px;}
 .footer{
 margin-top:50px;
 text-align:center;
@@ -180,18 +303,17 @@ display:none;
 align-items:center;
 justify-content:center;
 padding:20px;
+z-index:20;
 }
 .modal{
 width:100%;
 max-width:520px;
-background:var(--panel);
-border:1px solid var(--line);
+background:var(--panel-strong);
+border:1px solid rgba(255,255,255,.12);
 border-radius:24px;
 padding:24px;
 }
-.modal h3{
-margin-bottom:16px;
-}
+.modal h3{margin-bottom:16px;}
 input{
 width:100%;
 padding:14px 16px;
@@ -260,9 +382,7 @@ background:rgba(255,255,255,.04);
 color:#fff;
 margin-top:10px;
 }
-.copy-btn{
-margin-top:10px;
-}
+.copy-btn{margin-top:10px;}
 .link-entrega{
 margin-top:14px;
 padding:14px;
@@ -272,52 +392,127 @@ border:1px solid rgba(61,220,151,.18);
 display:none;
 word-break:break-word;
 }
-.link-entrega a{
-color:#bdf5dc;
+.link-entrega a{color:#bdf5dc;}
+
+@media (max-width: 900px){
+.nav{flex-direction:column;gap:12px;}
+.hero{padding:32px 22px;}
+.hero h1{font-size:34px;}
+.hero-stats{grid-template-columns:1fr;}
+.support-grid{grid-template-columns:1fr;}
 }
 </style>
 </head>
 <body>
+<div class="page">
+  <div class="container">
+    <header class="nav">
+      <div class="brand">BLACKOUTS</div>
+      <div class="nav-links">
+        <a href="#categorias">Categorias</a>
+        <a href="#destaques">Destaques</a>
+        <a href="#suporte">Suporte</a>
+      </div>
+      <a class="btn btn-ghost" href="admin.html">Entrar</a>
+    </header>
 
-<div class="container">
-  <div class="header">
-    <div>
-      <div class="logo">BLACKOUTS</div>
-      <div class="subtitle">Loja oficial</div>
-    </div>
-  </div>
-
-  <section class="hero" id="home">
-    <div>
-      <h1>Compra rápida com entrega automática</h1>
-      <p>
-        Escolha sua conta, pague via Pix e receba a liberação assim que o
-        pagamento for aprovado.
-      </p>
+    <section class="hero" id="home">
+      <div class="hero-title">BLACKOUTS</div>
+      <h1>A sua vitrine digital premium</h1>
+      <p>Compre contas, keys e assinaturas com entrega automática e suporte rápido.</p>
+      <div class="hero-tags">
+        <span class="tag">Entrega automática</span>
+        <span class="tag">Suporte rápido</span>
+        <span class="tag">Compra segura</span>
+      </div>
       <div class="hero-actions">
-        <a class="btn btn-inline" href="#produtos">Ver produtos</a>
-        <a class="btn btn-secondary btn-inline" href="entrega.html">Consultar entrega</a>
+        <a class="btn btn-primary" href="#destaques">Ver produtos</a>
+        <a class="btn btn-ghost" href="#suporte">Entrar no Discord</a>
       </div>
-      <div class="hero-badges">
-        <span class="badge">Pix instantâneo</span>
-        <span class="badge">Entrega automática</span>
-        <span class="badge">Suporte dedicado</span>
+      <div class="hero-stats">
+        <div class="stat-card">
+          <strong>4.9/5</strong>
+          <span>Avaliações</span>
+        </div>
+        <div class="stat-card">
+          <strong>24/7</strong>
+          <span>Entrega rápida</span>
+        </div>
+        <div class="stat-card">
+          <strong>100%</strong>
+          <span>Compra segura</span>
+        </div>
       </div>
+    </section>
+
+    <section class="section" id="categorias">
+      <div class="section-head">
+        <h2>Categorias</h2>
+        <p>Explore as categorias disponíveis na loja.</p>
+      </div>
+      <div class="category-grid">
+        <div class="category-card">
+          <div class="category-icon">🎮</div>
+          <h3>Games</h3>
+          <p>Contas e itens premium.</p>
+        </div>
+        <div class="category-card">
+          <div class="category-icon">📺</div>
+          <h3>Assinaturas</h3>
+          <p>Streaming e serviços.</p>
+        </div>
+        <div class="category-card">
+          <div class="category-icon">🔑</div>
+          <h3>Steam Keys</h3>
+          <p>Chaves digitais.</p>
+        </div>
+        <div class="category-card">
+          <div class="category-icon">🧠</div>
+          <h3>IA's</h3>
+          <p>Ferramentas e créditos.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="destaques">
+      <div class="section-head">
+        <h2>Produtos em destaque</h2>
+        <p>Compre contas, keys e assinaturas com entrega automática.</p>
+      </div>
+      <div id="produtos" class="products-grid">
+        <div class="loading">Carregando produtos...</div>
+      </div>
+    </section>
+
+    <section class="section" id="suporte">
+      <div class="support-grid">
+        <div class="support-card">
+          <span class="support-tag">Suporte</span>
+          <h3>Atendimento direto no Discord</h3>
+          <p>Tire dúvidas, fale com o suporte e acompanhe novidades da loja em um só lugar.</p>
+          <a class="btn btn-primary" href="#suporte">Entrar no Discord</a>
+        </div>
+        <div class="trust-card">
+          <h3>Rápido e seguro</h3>
+          <div class="trust-item">
+            <strong>4.9/5</strong>
+            <span>Avaliações</span>
+          </div>
+          <div class="trust-item">
+            <strong>24/7</strong>
+            <span>Suporte rápido</span>
+          </div>
+          <div class="trust-item">
+            <strong>Pix</strong>
+            <span>Pagamento instantâneo</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div class="footer">
+      © Blackouts — loja digital com identidade premium
     </div>
-    <div class="hero-panel">
-      <h3>Como funciona</h3>
-      <p>1) Escolha o produto. 2) Gere o Pix. 3) Após aprovação, a conta aparece no link de entrega.</p>
-    </div>
-  </section>
-
-  <h2 style="margin-bottom:20px;">Produtos disponíveis</h2>
-
-  <div id="produtos" class="grid">
-    <div class="loading">Carregando produtos...</div>
-  </div>
-
-  <div class="footer">
-    Blackouts © 2026
   </div>
 </div>
 
@@ -331,7 +526,7 @@ color:#bdf5dc;
     <input id="emailCliente" type="email" placeholder="Seu e-mail">
 
     <div class="btn-row">
-      <button class="btn" onclick="enviarPedido()">Gerar Pix</button>
+      <button class="btn btn-primary" onclick="enviarPedido()">Gerar Pix</button>
       <button class="btn btn-secondary" onclick="fecharModal()">Cancelar</button>
     </div>
 
@@ -342,7 +537,7 @@ color:#bdf5dc;
       <img id="pixQrImage" alt="QR Code Pix">
       <div style="margin-top:10px;">Copia e cola Pix:</div>
       <textarea id="pixCode" class="pix-code" readonly></textarea>
-      <button class="btn copy-btn" onclick="copiarPix()">Copiar código Pix</button>
+      <button class="btn btn-primary copy-btn" onclick="copiarPix()">Copiar código Pix</button>
       <div style="margin-top:12px; color:#aab5d6; font-size:13px;">
         A conta será liberada somente após confirmação do pagamento.
       </div>
@@ -375,11 +570,12 @@ async function carregarProdutos(){
       const estoque = produto.stock_available ?? produto.estoque ?? "-"
 
       html += `
-        <div class="card">
+        <div class="product-card">
           <h3>${nome}</h3>
           <div class="price">R$ ${preco.toFixed(2)}</div>
+          <div class="product-meta">Entrega automática via Pix</div>
           <div class="stock">Estoque: ${estoque}</div>
-          <button class="btn" onclick="abrirModal(${produto.id})">Comprar</button>
+          <button class="btn btn-primary" onclick="abrirModal(${produto.id})">Comprar</button>
         </div>
       `
     })
