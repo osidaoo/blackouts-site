@@ -472,6 +472,14 @@
           </div>
         </div>
 
+        <div style="margin-bottom:14px; display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end;">
+          <div style="min-width:220px; flex:1;">
+            <label for="estoqueFiltroProduto">Filtrar por produto</label>
+            <select id="estoqueFiltroProduto"></select>
+          </div>
+          <button id="btnLimparFiltroEstoque" class="btn btn-secondary small">Limpar filtro</button>
+        </div>
+
         <div class="grid">
           <div>
             <h3 id="estoqueFormTitle" style="margin-bottom:14px;">Adicionar item de estoque</h3>
@@ -546,6 +554,7 @@
     const btnAtualizarEstoque = document.getElementById("btnAtualizarEstoque")
     const btnSalvarEstoque = document.getElementById("btnSalvarEstoque")
     const btnCancelarEstoque = document.getElementById("btnCancelarEstoque")
+    const btnLimparFiltroEstoque = document.getElementById("btnLimparFiltroEstoque")
 
     const loginStatus = document.getElementById("loginStatus")
     const produtoStatus = document.getElementById("produtoStatus")
@@ -576,6 +585,7 @@
 
     const estoqueIdInput = document.getElementById("estoqueId")
     const estoqueProdutoSelect = document.getElementById("estoqueProdutoSelect")
+    const estoqueFiltroProduto = document.getElementById("estoqueFiltroProduto")
     const estoqueLoginInput = document.getElementById("estoqueLogin")
     const estoqueSenhaInput = document.getElementById("estoqueSenha")
     const estoqueExtraInput = document.getElementById("estoqueExtra")
@@ -670,17 +680,29 @@
 
       if (!produtosCache.length) {
         estoqueProdutoSelect.innerHTML = '<option value="">Nenhum produto</option>'
+        if (estoqueFiltroProduto) {
+          estoqueFiltroProduto.innerHTML = '<option value="">Todos os produtos</option>'
+        }
         return
       }
 
-      let options = '<option value="">Selecione um produto</option>'
+      let optionsCadastro = '<option value="">Selecione um produto</option>'
+      let optionsFiltro = '<option value="">Todos os produtos</option>'
 
       for (const produto of produtosCache) {
         const nome = produto.name ?? produto.nome ?? "Produto"
-        options += `<option value="${produto.id}">${nome}</option>`
+        optionsCadastro += `<option value="${produto.id}">${nome}</option>`
+        optionsFiltro += `<option value="${produto.id}">${nome}</option>`
       }
 
-      estoqueProdutoSelect.innerHTML = options
+      estoqueProdutoSelect.innerHTML = optionsCadastro
+      if (estoqueFiltroProduto) {
+        const valorAtual = estoqueFiltroProduto.value
+        estoqueFiltroProduto.innerHTML = optionsFiltro
+        if (valorAtual) {
+          estoqueFiltroProduto.value = valorAtual
+        }
+      }
     }
 
     async function lerRespostaSegura(resposta) {
@@ -895,7 +917,12 @@
       estoqueWrap.innerHTML = '<div class="empty">Carregando estoque...</div>'
 
       try {
-        const resposta = await fetch(API_URL + "/admin/estoque", {
+        const filtroProduto = estoqueFiltroProduto?.value || ""
+        const urlEstoque = filtroProduto
+          ? API_URL + "/admin/estoque?product_id=" + encodeURIComponent(filtroProduto)
+          : API_URL + "/admin/estoque"
+
+        const resposta = await fetch(urlEstoque, {
           headers: {
             Authorization: "Bearer " + getToken()
           }
@@ -1280,6 +1307,9 @@
       statProdutosTotais.textContent = "0"
       statEstoqueTotal.textContent = "0"
       senhaInput.value = ""
+      if (estoqueFiltroProduto) {
+        estoqueFiltroProduto.value = ""
+      }
     }
 
     btnLogin.addEventListener("click", login)
@@ -1297,6 +1327,15 @@
     btnAtualizarPedidos.addEventListener("click", carregarPedidos)
     btnAtualizarDashboard.addEventListener("click", carregarDashboard)
     btnAtualizarEstoque.addEventListener("click", carregarEstoque)
+    if (estoqueFiltroProduto) {
+      estoqueFiltroProduto.addEventListener("change", carregarEstoque)
+    }
+    btnLimparFiltroEstoque.addEventListener("click", () => {
+      if (estoqueFiltroProduto) {
+        estoqueFiltroProduto.value = ""
+      }
+      carregarEstoque()
+    })
     btnLogoutTop.addEventListener("click", logout)
 
     verificarSessao()

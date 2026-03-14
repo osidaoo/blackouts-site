@@ -8,7 +8,32 @@ const { createClient } = require("@supabase/supabase-js")
 
 const app = express()
 
-app.use(cors())
+const DEFAULT_ORIGINS = [
+  "https://blackouts-site.vercel.app",
+  "https://blackouts.site",
+  "https://www.blackouts.site",
+  "http://localhost:3000",
+  "http://localhost:5173"
+]
+
+const ALLOWED_ORIGINS = (process.env.CORS_ORIGINS || DEFAULT_ORIGINS.join(","))
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean)
+
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin) {
+      return callback(null, true)
+    }
+
+    if (ALLOWED_ORIGINS.includes(origin)) {
+      return callback(null, true)
+    }
+
+    return callback(null, false)
+  }
+}))
 app.use(express.json())
 
 const supabase = createClient(
@@ -18,6 +43,24 @@ const supabase = createClient(
 
 const PORT = process.env.PORT || 3000
 const MP_ACCESS_TOKEN = process.env.MP_ACCESS_TOKEN
+
+const rateLimitLogin = criarRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  message: "Muitas tentativas de login. Aguarde alguns minutos."
+})
+
+const rateLimitPedidos = criarRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  message: "Muitas tentativas de pedido. Aguarde alguns minutos."
+})
+
+const rateLimitPedidoStatus = criarRateLimiter({
+  windowMs: 10 * 60 * 1000,
+  max: 60,
+  message: "Muitas consultas de pedido. Aguarde alguns minutos."
+})
 
 function gerarToken(usuario) {
   return jwt.sign(
@@ -81,6 +124,43 @@ function normalizarEmail(email) {
   return String(email || "").trim().toLowerCase()
 }
 
+const STATUS_ESTOQUE_DISPONIVEL = ["available", "disponivel", "ativo", "livre"]
+
+function criarRateLimiter({ windowMs, max, message }) {
+  const hits = new Map()
+  const limpezaIntervalo = windowMs * 4
+  let ultimaLimpeza = Date.now()
+
+  return (req, res, next) => {
+    const key = obterIp(req)
+    const agora = Date.now()
+
+    if (agora - ultimaLimpeza > limpezaIntervalo) {
+      for (const [chave, registro] of hits.entries()) {
+        if (agora - registro.inicio > windowMs) {
+          hits.delete(chave)
+        }
+      }
+      ultimaLimpeza = agora
+    }
+
+    const registro = hits.get(key)
+
+    if (!registro || agora - registro.inicio > windowMs) {
+      hits.set(key, { inicio: agora, contagem: 1 })
+      return next()
+    }
+
+    registro.contagem += 1
+
+    if (registro.contagem > max) {
+      return res.status(429).json({ erro: message || "Muitas requisições. Tente novamente mais tarde." })
+    }
+
+    next()
+  }
+}
+
 async function carregarProdutosComEstoque({ orderBy } = {}) {
   let query = supabase.from("products").select("*")
 
@@ -128,6 +208,59 @@ async function carregarProdutosComEstoque({ orderBy } = {}) {
   return { data: produtosComEstoque }
 }
 
+async function verificarEstoqueDisponivel(productId) {
+  const { data, error } = await supabase
+    .from("inventory_items")
+    .select("id, status")
+    .eq("product_id", productId)
+    .in("status", STATUS_ESTOQUE_DISPONIVEL)
+    .limit(1)
+
+  if (error) {
+    return { error }
+  }
+
+  return { available: Array.isArray(data) && data.length > 0 }
+}
+
+async function reservarItemEstoque(productId) {
+  for (let tentativa = 0; tentativa < 3; tentativa += 1) {
+    const { data: itens, error: erroBusca } = await supabase
+      .from("inventory_items")
+      .select("*")
+      .eq("product_id", productId)
+      .in("status", STATUS_ESTOQUE_DISPONIVEL)
+      .limit(20)
+
+    if (erroBusca) {
+      return { error: erroBusca }
+    }
+
+    if (!Array.isArray(itens) || !itens.length) {
+      return { data: null }
+    }
+
+    for (const item of itens) {
+      const { data: atualizados, error: erroUpdate } = await supabase
+        .from("inventory_items")
+        .update({ status: "sold" })
+        .eq("id", item.id)
+        .in("status", STATUS_ESTOQUE_DISPONIVEL)
+        .select()
+
+      if (erroUpdate) {
+        continue
+      }
+
+      if (Array.isArray(atualizados) && atualizados.length) {
+        return { data: atualizados[0] }
+      }
+    }
+  }
+
+  return { data: null }
+}
+
 app.get("/", (req, res) => {
   res.json({ status: "API Blackouts online" })
 })
@@ -148,7 +281,7 @@ app.get("/produtos", async (req, res) => {
   }
 })
 
-app.post("/login", async (req, res) => {
+app.post("/login", rateLimitLogin, async (req, res) => {
   try {
     const { email, senha } = req.body
 
@@ -351,9 +484,17 @@ app.get("/admin/pedidos", autenticarToken, somenteAdmin, async (req, res) => {
 
 app.get("/admin/estoque", autenticarToken, somenteAdmin, async (req, res) => {
   try {
-    const { data: estoque, error: erroEstoque } = await supabase
+    const produtoFiltro = String(req.query.product_id || req.query.produto || "").trim()
+
+    let query = supabase
       .from("inventory_items")
       .select("*")
+
+    if (produtoFiltro) {
+      query = query.eq("product_id", produtoFiltro)
+    }
+
+    const { data: estoque, error: erroEstoque } = await query
       .order("created_at", { ascending: false })
 
     if (erroEstoque) return res.status(500).json({ erro: erroEstoque.message })
@@ -473,7 +614,7 @@ app.delete("/admin/estoque/:id", autenticarToken, somenteAdmin, async (req, res)
   }
 })
 
-app.post("/pedidos", async (req, res) => {
+app.post("/pedidos", rateLimitPedidos, async (req, res) => {
   try {
     const { produto_id, nome_cliente, email_cliente } = req.body
     const ip_cliente = obterIp(req)
@@ -494,6 +635,17 @@ app.post("/pedidos", async (req, res) => {
 
     if (erroProduto || !produto) {
       return res.status(404).json({ erro: "Produto não encontrado" })
+    }
+
+    const { available: estoqueDisponivel, error: erroEstoqueDisponivel } =
+      await verificarEstoqueDisponivel(produto.id)
+
+    if (erroEstoqueDisponivel) {
+      return res.status(500).json({ erro: "Erro ao verificar estoque" })
+    }
+
+    if (!estoqueDisponivel) {
+      return res.status(409).json({ erro: "Produto sem estoque disponível" })
     }
 
     const payloadOrder = {
@@ -622,7 +774,7 @@ app.post("/pedidos", async (req, res) => {
   }
 })
 
-app.get("/pedido-status", async (req, res) => {
+app.get("/pedido-status", rateLimitPedidoStatus, async (req, res) => {
   try {
     const pedidoId = String(req.query.pedido || "").trim()
     const emailCliente = normalizarEmail(req.query.email)
@@ -801,23 +953,32 @@ app.post("/webhook/mercadopago", async (req, res) => {
       return res.status(200).send("ok")
     }
 
-    const { data: itemEstoque, error: erroEstoque } = await supabase
-      .from("inventory_items")
-      .select("*")
-      .eq("product_id", orderItem.product_id)
-      .limit(50)
+    const { data: contaDisponivel, error: erroReserva } =
+      await reservarItemEstoque(orderItem.product_id)
 
-    if (erroEstoque) {
-      console.log("Erro ao buscar estoque:", erroEstoque)
+    if (erroReserva) {
+      console.log("Erro ao buscar estoque:", erroReserva)
       return res.status(500).send("erro ao buscar estoque")
     }
 
-    const contaDisponivel = (itemEstoque || []).find(
-      (item) => normalizarStatusEstoque(item.status) === "available"
-    )
-
     if (!contaDisponivel) {
       console.log("Sem estoque para entregar")
+
+      await supabase
+        .from("orders")
+        .update({
+          status: "paid",
+          payment_status: "paid"
+        })
+        .eq("id", order.id)
+
+      await supabase
+        .from("payments")
+        .update({
+          status: "approved"
+        })
+        .eq("id", paymentRegistro.id)
+
       return res.status(200).send("ok")
     }
 
@@ -828,18 +989,6 @@ app.post("/webhook/mercadopago", async (req, res) => {
       senha: contaDisponivel.content_password,
       extra: contaDisponivel.content_extra || null
     })
-
-    const { error: erroAtualizaEstoque } = await supabase
-      .from("inventory_items")
-      .update({
-        status: "sold"
-      })
-      .eq("id", contaDisponivel.id)
-
-    if (erroAtualizaEstoque) {
-      console.log("Erro ao atualizar estoque:", erroAtualizaEstoque)
-      return res.status(500).send("erro ao atualizar estoque")
-    }
 
     const { error: erroAtualizaOrderItem } = await supabase
       .from("order_items")
